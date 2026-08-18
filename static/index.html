@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP Automation Web Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=9">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Top Toolbar -->
+        <header id="main-header">
+            <div class="logo-area">
+                <span class="sap-logo">SAP</span>
+                <h1>Automation Dashboard</h1>
+            </div>
+            <div class="header-actions">
+                <button id="btn-login-sap" class="toolbar-btn" title="Login SAP otomatis dari kredensial .env">
+                    <span class="icon">🔑</span> Login SAP
+                </button>
+                <button id="btn-test-sap" class="toolbar-btn" title="Cek status koneksi & scripting SAP">
+                    <span class="icon">🔌</span> Test SAP
+                </button>
+                <button id="btn-refresh" class="toolbar-btn" title="Refresh Halaman">
+                    <span class="icon">⟳</span> Refresh
+                </button>
+                <div id="live-clock">🕐 Loading...</div>
+            </div>
+        </header>
+
+        <!-- Main Body -->
+        <div id="main-body">
+            <!-- Sidebar: Job List -->
+            <aside id="sidebar">
+                <div class="panel-header">
+                    <h2>📋 Job List</h2>
+                </div>
+                <div class="job-list-container">
+                    <ul id="job-list">
+                        <!-- Jobs will be populated dynamically -->
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main id="content-area">
+                <!-- Top Detail Card -->
+                <section class="card" id="job-detail-card">
+                    <div class="panel-header detail-header">
+                        <h2>🔍 Job Detail & Parameters</h2>
+                        <span id="global-status-badge" class="badge idle">⬤ Idle</span>
+                    </div>
+                    
+                    <div class="card-content">
+                        <!-- Job Meta Info -->
+                        <div class="job-meta-grid">
+                            <div class="meta-item">
+                                <span class="meta-label">Job Name:</span>
+                                <span id="detail-job-name" class="meta-value">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Script File:</span>
+                                <span id="detail-job-file" class="meta-value">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Description:</span>
+                                <span id="detail-job-desc" class="meta-value">—</span>
+                            </div>
+                        </div>
+
+                        <!-- Database Settings -->
+                        <div class="db-settings-section">
+                            <h3 class="section-title">Database Settings</h3>
+                            <div class="db-form-grid">
+                                <div class="form-group">
+                                    <label for="db-server">Server</label>
+                                    <input type="text" id="db-server" value="">
+                                </div>
+                                <div class="form-group">
+                                    <label for="db-user">User</label>
+                                    <input type="text" id="db-user" value="">
+                                </div>
+                                <div class="form-group">
+                                    <label for="db-pwd">Password</label>
+                                    <input type="password" id="db-pwd" value="">
+                                </div>
+                                <div class="form-group">
+                                    <label for="db-name">DB Name</label>
+                                    <input type="text" id="db-name" value="">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Parameter Form -->
+                        <div class="parameters-section">
+                            <h3 class="section-title">⚙ Parameter Eksekusi 
+                                <span class="subtitle">(edit nilai sebelum Execute)</span>
+                            </h3>
+                            <form id="parameter-form">
+                                <div id="dynamic-params-container">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Control Buttons -->
+                        <div class="control-actions">
+                            <button id="btn-execute" class="btn btn-primary">▶ Execute Job</button>
+                            <button id="btn-stop" class="btn btn-danger" disabled>⏹ Stop Job</button>
+                            <button id="btn-save-config" class="btn btn-secondary">💾 Save Config</button>
+                            <button id="btn-reset" class="btn btn-secondary">↺ Reset Default</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Bottom Console Log Area -->
+                <section class="card console-card" id="log-card">
+                    <div class="panel-header log-header">
+                        <h2>📄 Execution Log</h2>
+                        <button id="btn-clear-log" class="toolbar-btn btn-sm">🗑 Clear Log</button>
+                    </div>
+                    <div class="console-body">
+                        <pre id="console-output"><span class="log-SYSTEM">[SYSTEM] Dashboard siap (v3.1 - no-cache). Pilih job dan klik [Execute].</span></pre>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Footer / Status Bar -->
+        <footer id="statusbar">
+            <span id="status-message">Ready</span>
+            <span class="version-text">SAP Automation Web Dashboard v3.0 | FastAPI + Modern CSS</span>
+        </footer>
+    </div>
+
+    <script src="/static/app.js?v=9"></script>
+</body>
+</html>

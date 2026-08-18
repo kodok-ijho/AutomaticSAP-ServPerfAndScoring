@@ -1,0 +1,44 @@
+# Kredensial & konfigurasi runtime (JANGAN commit)
+.env
+job_config.json
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Output / hasil download dan export SAP
+*.xlsx
+*.xls
+*.dat
+*.bak
+*.tmp
+Combined_KE30_*.txt
+combine_*.txt
+ZSME09E_Data*.txt
+ZSMR019 - *.txt
+ZSMR007B - */
+*.tsv
+
+# Agent / AI local workspace config
+.agents/
+.claude/
+.gemini/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs & Runtime Dumps
+*.log
+logs/
