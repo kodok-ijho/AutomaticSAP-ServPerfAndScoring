@@ -15,7 +15,8 @@ import unittest
 from job_definitions import SCRIPTS, build_cli_args, validate_job_config
 from db_utils import clean_sap_number, parse_sap_int, is_sap_numeric, format_sap_number_display
 from job_runner import classify_log_tag, STATUS_IDLE, STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILED
-from path_resolver import resolve_workspace_paths, parse_period_date
+from path_resolver import resolve_workspace_paths, parse_period_date, get_smart_spool_date_range
+from datetime import datetime
 
 
 class TestJobDefinitions(unittest.TestCase):
@@ -60,6 +61,20 @@ class TestPathResolver(unittest.TestCase):
         dt = parse_period_date("2026-04-01")
         self.assertEqual(dt.year, 2026)
         self.assertEqual(dt.month, 4)
+
+    def test_smart_spool_lookback_monday(self):
+        # 2026-08-24 adalah hari Senin (weekday 0)
+        monday_dt = datetime(2026, 8, 24)
+        from_str, to_str = get_smart_spool_date_range(monday_dt)
+        self.assertEqual(from_str, "21.08.2026", "Hari Senin harus mundur 3 hari ke hari Jumat (21.08.2026)")
+        self.assertEqual(to_str, "24.08.2026")
+
+    def test_smart_spool_lookback_tuesday(self):
+        # 2026-08-25 adalah hari Selasa (weekday 1)
+        tuesday_dt = datetime(2026, 8, 25)
+        from_str, to_str = get_smart_spool_date_range(tuesday_dt)
+        self.assertEqual(from_str, "24.08.2026", "Hari Selasa harus mundur 1 hari ke hari Senin (24.08.2026)")
+        self.assertEqual(to_str, "25.08.2026")
 
 
 class TestSAPNumberParsing(unittest.TestCase):

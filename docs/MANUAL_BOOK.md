@@ -327,16 +327,32 @@ flowchart TD
 
 ## 8. Panduan Fitur Penjadwalan Otomatis (Scheduler)
 
-Aplikasi dilengkapi modul penjadwalan mandiri tanpa perlu konfigurasi Windows Task Scheduler tambahan.
+Aplikasi menyediakan dua metode penjadwalan:
 
-### ⏰ Cara Mengatur Jadwal:
+### 8.1 Penjadwalan Windows Task Scheduler (Direkomendasikan untuk Laptop / Background)
+Untuk pengguna laptop di mana laptop dimatikan pada akhir pekan / hari libur:
+1. Buka PowerShell dan jalankan:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File setup_scheduler.ps1
+   ```
+2. Skrip otomatis mendaftarkan task **`SAP_Automation_Daily_Pipeline`** ke Windows Task Scheduler dengan aturan:
+   - **Jadwal**: Setiap Senin s/d Jumat pukul **08:00 Pagi**.
+   - **Fitur Laptop *"Start When Available"***: Jika laptop Anda baru dinyalakan setelah pukul 08:00 (misal 08:30), task akan **langsung otomatis dieksekusi begitu laptop aktif dan terhubung ke jaringan kantor/VPN**.
+   - **Log Otomatis**: Setiap proses otomatis mencatat riwayat eksekusi di folder `logs/`.
+
+### 8.2 Smart Spool Lookback di Hari Senin
+Sistem memiliki kecerdasan tanggal otomatis:
+- **Selasa s/d Jumat**: Menarik spool `H-1` (kemarin sore jam 17:00).
+- **Hari Senin**: Otomatis mundur **`H-3` (Jumat sore jam 17:00)** sehingga hasil eksekusi akhir pekan tidak hilang.
+
+### 8.3 Penjadwalan Internal Dashboard (Opsional)
 1. Pilih Job yang ingin dijadwalkan.
 2. Pada bagian bawah form parameter:
-   - **`Sch Time`**: Masukkan jam eksekusi dalam format 24 jam `HH:mm` (contoh: `07:30` untuk pukul setengah delapan pagi).
+   - **`Sch Time`**: Masukkan jam eksekusi dalam format 24 jam `HH:mm` (contoh: `08:00`).
    - **`Sch Active`**: Pilih / isi `True`.
 3. Klik tombol **Save Config** (💾).
 
-> ⚠️ **PENTING:** Aplikasi (Desktop Dashboard atau Web Dashboard) **harus tetap menyala / running** pada komputer atau server agar scheduler dapat memicu job tepat waktu.
+> ⚠️ **CATATAN:** Jika menggunakan penjadwalan internal Dashboard, aplikasi (Desktop atau Web Dashboard) harus tetap menyala / running di laptop. Jika ingin headless tanpa membuka dashboard, gunakan Task Scheduler (Opsi 8.1).
 
 ---
 

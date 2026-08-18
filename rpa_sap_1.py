@@ -83,8 +83,8 @@ def main(
         sched_h = int(parts[0])
         sched_m = int(parts[1])
     except Exception:
-        print(f"[CONFIG] Peringatan: Format sched-start-time tidak valid ('{sched_start_time}'). Menggunakan 18:00.")
-        sched_h, sched_m = 18, 0
+        print(f"[CONFIG] Peringatan: Format sched-start-time tidak valid ('{sched_start_time}'). Menggunakan 17:00.")
+        sched_h, sched_m = 17, 0
 
     offset_counter = 0
     call_counter = 0
@@ -170,8 +170,8 @@ if __name__ == "__main__":
                         help="Delay antar iterasi batch (detik)")
     parser.add_argument("--vbs-path", default="vbs\\CreateBG007B-Scheduled.vbs",
                         help="Path ke file VBS SAP GUI")
-    parser.add_argument("--sched-start-time", default="18:00",
-                        help="Jam mulai jadwal SAP BG Job (format HH:MM, contoh: 18:00)")
+    parser.add_argument("--sched-start-time", default="17:00",
+                        help="Jam mulai jadwal SAP BG Job (format HH:MM, contoh: 17:00)")
 
     parser.add_argument("--db-server", default=None)
     parser.add_argument("--db-user", default=None)

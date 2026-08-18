@@ -19,7 +19,7 @@ from datetime import datetime
 from config import DB_CONFIG
 from db_utils import get_connection_with_retry
 from sap_utils import ensure_sap_logged_in, verify_sap_ready, run_vbs
-from path_resolver import resolve_workspace_paths, ensure_workspace_directories
+from path_resolver import resolve_workspace_paths, ensure_workspace_directories, get_smart_spool_date_range
 
 # Import ETL helpers directly from pipeline modules for in-process high performance
 import rpa_sap_1
@@ -65,6 +65,7 @@ def get_active_closing_period(db_config: dict | None = None) -> tuple[str, str, 
 
 def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[int], db_config: dict) -> None:
     """Mencetak tabel inspeksi variabel pre-flight untuk ditinjau oleh operator."""
+    spool_from, spool_to = get_smart_spool_date_range()
     print("=" * 80)
     print(" [PRE-FLIGHT] DAILY AUTOMATION PIPELINE -- VARIABLE INSPECTOR")
     print("=" * 80)
@@ -72,6 +73,8 @@ def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[in
     print(f" Root Workspace (CSSD)   : {paths['cssd_root']}")
     print(f" Reporting SS Base       : {paths['reporting_ss']}")
     print(f" Tahapan yang Dipilih    : {', '.join(f'Tahap {s}' for s in stages_to_run)}")
+    print(f" Sched BG Job Jam (Thp 1): 17:00 Sore (Eksekusi Batch di Server SAP)")
+    print(f" Spool Lookback (Tahap 2): {spool_from} s/d {spool_to} (Auto H-3 jika Senin)")
     print("-" * 80)
     print(f" [Tahap 1 & 2] ZSMR007B  : {paths['zsmr007b_dir']}")
     print(f" [Tahap 3] KE30 Divisi   : {paths['ke30_div_dir']}")
@@ -87,7 +90,7 @@ def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[in
 def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_config: dict) -> bool:
     """Tahap 1: Membuat Background Job ZSMR007B per 1.000 equipment."""
     print("\n" + "─" * 70)
-    print(f" ▶ [TAHAP 1/6] MEMBUAT BACKGROUND JOB ZSMR007B (Batch {batch_size:,} Eq)")
+    print(f" ▶ [TAHAP 1/6] MEMBUAT BACKGROUND JOB ZSMR007B (Batch {batch_size:,} Eq, Target: 17:00)")
     print("─" * 70)
     vbs_path = os.path.join(vbs_dir, "CreateBG007B-Scheduled.vbs")
     ret = rpa_sap_1.main(
@@ -96,7 +99,7 @@ def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_conf
         batch_size=batch_size,
         delay_seconds=10,
         vbs_path=vbs_path,
-        sched_start_time="18:00",
+        sched_start_time="17:00",
         db_config=db_config,
     )
     return ret == 0
@@ -111,12 +114,12 @@ def run_stage_2_zsmr007b_etl(periode: str, paths: dict, vbs_dir: str, db_config:
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "DownloadBGJob007B.vbs")
 
-    # 1. Download via VBS
-    from_date = datetime.strptime(periode, "%Y-%m-%d").strftime("%d.%m.%Y")
-    to_date = datetime.now().strftime("%d.%m.%Y")
+    # 1. Download via VBS dengan smart lookback (H-3 jika hari Senin, H-1 jika hari lain)
+    from_date, to_date = get_smart_spool_date_range()
     save_path_arg = folder.rstrip("\\") + "\\"
 
     print(f"[STEP 2.1] Menjalankan VBScript download spool: {vbs_path}")
+    print(f"           Rentang Spool: {from_date} s/d {to_date} (Smart Lookback)")
     vbs_ok = run_vbs(vbs_path, [from_date, to_date, save_path_arg])
     if not vbs_ok:
         print("[WARN] Eksekusi VBS download ZSMR007B mengalami kendala. Melanjutkan pemeriksaan file lokal...")
@@ -334,11 +337,22 @@ def main(
         print("\n[DRY RUN] Mode inspeksi aktif. Validasi variabel selesai tanpa eksekusi SAP.")
         return 0
 
-    # 5. Pre-flight Check: SAP GUI Login
+    # 5. Pre-flight Check: Database Connectivity & SAP GUI Login
+    print("\n[PRE-FLIGHT] Memeriksa konektivitas Database Server...")
+    try:
+        conn = get_connection_with_retry(effective_db, max_retries=2, base_delay=1.0)
+        conn.close()
+        print("[PRE-FLIGHT OK] Database SQL Server terhubung.")
+    except Exception as db_err:
+        print(f"[PRE-FLIGHT ALERT] Gagal terhubung ke database server {effective_db.get('server')}: {db_err}")
+        print("[HINT] Pastikan laptop Anda telah terhubung ke jaringan kantor (LAN) atau VPN Astragraphia.")
+        return 1
+
     vbs_login = os.path.join(vbs_dir, "LoginSAP.vbs")
-    print("\n[PRE-FLIGHT] Memeriksa status login SAP GUI...")
+    print("[PRE-FLIGHT] Memeriksa status login SAP GUI...")
     if not ensure_sap_logged_in(vbs_login):
         print("[CRITICAL] SAP GUI belum siap / login gagal. Otomatisasi dibatalkan.")
+        print("[HINT] Pastikan SAP Logon sudah dibuka dan user/password di .env sudah benar.")
         return 1
 
     start_total_time = time.time()

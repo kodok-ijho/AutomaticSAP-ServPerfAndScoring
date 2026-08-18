@@ -15,7 +15,7 @@ Menerapkan pola baku yang terdapat di D:\\Kerja\\:
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 MONTH_MAP_EN = {
@@ -23,6 +23,28 @@ MONTH_MAP_EN = {
     5: "MAY", 6: "JUN", 7: "JUL", 8: "AUG",
     9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"
 }
+
+
+def get_smart_spool_date_range(ref_date: datetime | None = None) -> tuple[str, str]:
+    """Menghasilkan rentang tanggal (from_date, to_date) dalam format 'dd.MM.yyyy' untuk spool SAP.
+
+    Logika Cerdas:
+    - Hari Senin (weekday 0) : from_date mundur 3 hari (Jumat / H-3)
+    - Hari Minggu (weekday 6): from_date mundur 2 hari (Jumat / H-2)
+    - Hari Lainnya           : from_date mundur 1 hari (Kemarin / H-1)
+    - to_date                : Hari ini (ref_date)
+    """
+    today = ref_date or datetime.now()
+    weekday = today.weekday()
+
+    if weekday == 0:  # Hari Senin
+        from_dt = today - timedelta(days=3)
+    elif weekday == 6:  # Hari Minggu
+        from_dt = today - timedelta(days=2)
+    else:  # Selasa s/d Sabtu
+        from_dt = today - timedelta(days=1)
+
+    return from_dt.strftime("%d.%m.%Y"), today.strftime("%d.%m.%Y")
 
 
 def parse_period_date(periode: str | datetime) -> datetime:
