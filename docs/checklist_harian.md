@@ -1,6 +1,6 @@
 # 📋 Checklist Operasional Operator — SAP Automation
 
-Gunakan lembar checklist ini setiap kali menjalankan proses penarikan data harian maupun penutupan (closing) bulanan untuk memastikan tidak ada tahapan data yang terlewat.
+Gunakan lembar checklist ini setiap kali menjalankan proses penarikan data harian maupun penutupan (closing) bulanan untuk memastikan seluruh tahapan berjalan sukses.
 
 ---
 
@@ -11,23 +11,34 @@ Gunakan lembar checklist ini setiap kali menjalankan proses penarikan data haria
 - [ ] **SAP Logon**: Buka aplikasi SAP Logon dan pastikan user sudah login.
 - [ ] **Test SAP**: Klik tombol **Test SAP** di Dashboard — pastikan status menunjukkan `Session aktif & sudah login. Scripting OK.`
 - [ ] **Tabel Closing**: Pastikan tabel `Tb_R_PeriodeClosing` di database sudah memiliki baris tanggal untuk periode yang akan diproses.
+- [ ] **Inspeksi Variabel**: Lakukan dry-run / inspeksi path folder (`python daily_orchestrator.py --dry-run`).
 
 ---
 
-## 🔄 2. Urutan Eksekusi Job (Closing Bulanan)
+## 🚀 2. Metode Eksekusi yang Tersedia
 
-| Check | Urutan | Nama Job | Status Harapan | Tindakan Operator |
-|:---:|:---:|:---|:---|:---|
-| [ ] | **Langkah 1** | **CREATE BG JOB ZSMR007B** | `SUCCESS` | Pastikan offset peralatan tersalin ke clipboard dan terdaftar di SAP SM37. |
-| [ ] | **Langkah 2** | *Tunggu Background Job SAP* | Selesai di SM37 | Cek transaksi `SM37` di SAP sampai status job menjadi `Finished`. |
-| [ ] | **Langkah 3** | **DOWNLOAD BG JOB ZSMR007B** | `SUCCESS` | Pastikan file `*1.txt` dan `*2.txt` terunduh di folder tujuan dan ukuran > 0 KB. |
-| [ ] | **Langkah 4** | **MERAPIHKAN HASIL ZSMR007B** | `SUCCESS` | Pastikan opsi *Insert ke SQL* bernilai `True`. Verifikasi baris ter-insert ke tabel `ZSMR007B`. |
-| [ ] | **Langkah 5** | **DOWNLOAD LAPORAN KE30 (Divisi)** | `SUCCESS` | Pastikan seluruh file `.dat` tiap divisi terunduh ke folder target. |
-| [ ] | **Langkah 6** | **PERAPIHAN KE30 (Divisi)** | `SUCCESS` | Pastikan opsi *Insert ke SQL* bernilai `True`. File `Combined_KE30_*.xlsx` berhasil dibuat. |
-| [ ] | **Langkah 7** | **DOWNLOAD LAPORAN KE30 (Eq)** | `SUCCESS` | Pastikan file `.dat` rincian equipment terunduh. |
-| [ ] | **Langkah 8** | **PERAPIHAN KE30 (Eq)** | `SUCCESS` | Pastikan opsi *Insert ke SQL* bernilai `True`. Data terupload ke tabel `KE30_ByEq`. |
-| [ ] | **Langkah 9** | **ZSME09E AUTOMATION** | `SUCCESS` | Pastikan data pergerakan material terupload ke tabel `ZSME09E`. |
-| [ ] | **Langkah 10** | **DOWNLOAD LAPORAN ZSMR019** | `SUCCESS` | Pastikan opsi *Insert ke SQL* bernilai `True`. File `ZSMR019 - *.txt` terupload ke tabel `ZSMR019`. |
+### Opsi A: Eksekusi 1-Click Otomatisasi Harian Terpadu (Direkomendasikan)
+Cukup jalankan job **`DAILY AUTOMATION PIPELINE – Full 6 Stages`** di Dashboard (atau via `run_daily.bat`). Sistem akan otomatis menjalankan 6 tahapan secara berurutan:
+
+| Check | Tahap | Deskripsi Tahapan | Status Target |
+|:---:|:---:|:---|:---|
+| [ ] | **Tahap 1** | **CREATE BG JOB ZSMR007B** (Batch 1.000 Equipment) | `[OK] SUKSES` |
+| [ ] | **Tahap 2** | **DOWNLOAD & UPSERT ZSMR007B** (Merge `*1` & `*2` ➔ Tb `ZSMR007B`) | `[OK] SUKSES` |
+| [ ] | **Tahap 3** | **DOWNLOAD & UPSERT KE30 DIVISI** (Excel COM ➔ Tb `KE30`) | `[OK] SUKSES` |
+| [ ] | **Tahap 4** | **DOWNLOAD & UPSERT KE30 EQUIPMENT** (Parse Eq ➔ Tb `KE30_ByEq`) | `[OK] SUKSES` |
+| [ ] | **Tahap 5** | **DOWNLOAD & UPSERT ZSME09E** (Material Movement ➔ Tb `ZSME09E`) | `[OK] SUKSES` |
+| [ ] | **Tahap 6** | **DOWNLOAD & UPSERT ZSMR019** (Service Order ➔ Tb `ZSMR019`) | `[OK] SUKSES` |
+
+---
+
+### Opsi B: Eksekusi Manual Bertahap (Step-by-Step)
+Jika hanya ingin menjalankan atau mengulang tahapan tertentu secara terpisah:
+1. `rpa_sap_1.py` (Create BG Job ZSMR007B)
+2. `download_zsmr007b.py` ➔ `process_reports.py` (Download & Upsert ZSMR007B)
+3. `download_ke30.py` ➔ `ProsesKE30byDiv.py` (Download & Upsert KE30 Divisi)
+4. `download_ke30_eq.py` ➔ `ProcessKE30byEq.py` (Download & Upsert KE30 Equipment)
+5. `automate_zsme09e.py` (Download & Upsert ZSME09E)
+6. `download_zsmr019.py` (Download & Upsert ZSMR019)
 
 ---
 
@@ -36,7 +47,7 @@ Gunakan lembar checklist ini setiap kali menjalankan proses penarikan data haria
 Jalankan kueri SQL berikut di SQL Server Management Studio (SSMS) atau DBeaver untuk memverifikasi kelengkapan data periode yang baru saja diproses:
 
 ```sql
-DECLARE @TargetPeriode DATE = '2026-06-01';
+DECLARE @TargetPeriode DATE = '2026-08-01';
 
 SELECT 'ZSMR007B' AS Tabel, COUNT(*) AS TotalBaris FROM ZSMR007B WHERE Periode = @TargetPeriode
 UNION ALL
@@ -49,4 +60,4 @@ UNION ALL
 SELECT 'ZSMR019' AS Tabel, COUNT(*) AS TotalBaris FROM ZSMR019 WHERE Periode = @TargetPeriode;
 ```
 
-*Jika semua tabel menghasilkan `TotalBaris > 0`, maka proses closing telah berhasil 100%.*
+*Jika semua tabel menghasilkan `TotalBaris > 0`, maka proses harian/closing telah berhasil 100%.*

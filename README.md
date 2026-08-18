@@ -7,7 +7,7 @@
 [![SAP GUI Scripting](https://img.shields.io/badge/SAP%20GUI-Scripting%20COM%20API-003A70.svg?style=for-the-badge&logo=sap&logoColor=white)](https://www.sap.com/)
 [![SQL Server](https://img.shields.io/badge/Microsoft%20SQL%20Server-ODBC%2017-CC292B.svg?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)](https://www.microsoft.com/sql-server)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/release-v1.0.0-orange.svg?style=for-the-badge)](https://github.com/kodok-ijho/AutomaticSAP-ServPerfAndScoring)
+[![Version](https://img.shields.io/badge/release-v1.1.0-orange.svg?style=for-the-badge)](https://github.com/kodok-ijho/AutomaticSAP-ServPerfAndScoring)
 
 **Platform Robotic Process Automation (RPA) & ETL Tingkat Enterprise untuk Ekstraksi, Transformasi, dan Sinkronisasi Data SAP ERP ke Microsoft SQL Server secara Otomatis.**
 
@@ -29,10 +29,11 @@ Sistem ini dirancang dengan arsitektur modern yang memisahkan lapisan bisnis dan
 
 ## ⚡ Fitur Utama (Key Features)
 
+- ⭐ **Otomatisasi Harian Terpadu (Daily E2E Pipeline)**: Eksekusi 1-Click / Terjadwal 6 Tahap (Create BG 007B batch 1.000 eq, Download & Upsert 007B, KE30 Divisi, KE30 Eq, ZSME09E, ZSMR019) dengan resolusi path dinamis otomatis ke `D:\Kerja\`.
 - 🤖 **Orkestrasi SAP Otomatis**: Mendukung eksekusi VBScript terisolasi (`wscript.exe`), deteksi session aktif, penanganan modal popup multi-login (`wnd[1]`), dan mekanisme auto-login terintegrasi.
 - 🗄️ **Resilient Database Layer**: Koneksi `pyodbc` dengan *exponential retry*, penghapusan data per periode otomatis (*idempotent cleanup*), dan pengunggahan *batch chunking* (1.000 baris/chunk) dengan `fast_executemany` untuk mencegah buffer deadlock.
 - 🧹 **Pembersihan & Normalisasi Angka SAP Universal**: Normalisasi otomatis format angka khas SAP (koma desimal `1.234,56` ➔ `1234.56`, tanda minus di belakang `322.361-` ➔ `-322361.0`, dan deteksi encoding dinamis `UTF-16`/`UTF-8`/`CP1252`).
-- ⏱️ **Penjadwalan Otomatis (Cron Scheduler)**: Modul scheduler background mandiri yang dapat memicu eksekusi job berdasarkan jam target tanpa bergantung pada Task Scheduler eksternal.
+- ⏱️ **Penjadwalan Otomatis (Cron & Windows Task Scheduler)**: Mendukung penjadwalan via Dashboard loop maupun eksekusi mandiri headless via `run_daily.bat`.
 - 📡 **Live Stream Logging & Categorization**: Klasifikasi tag output (`ERROR`, `OK`, `WARN`, `INFO`) dengan pewarnaan terminal interaktif di desktop dan web dashboard.
 - 🛡️ **Zero-Trust Credential Architecture**: Kredensial sensitif diisolasi penuh di file `.env`, tidak pernah disimpan di source code maupun file JSON konfigurasi runtime.
 
@@ -51,6 +52,8 @@ flowchart TD
 
     subgraph Service_Layer["⚙️ Core Engine & Orchestration"]
         JR["Job Runner Service\n(job_runner.py)"]
+        DO["Daily Orchestrator\n(daily_orchestrator.py)"]
+        PR["Path Resolver\n(path_resolver.py)"]
         SCH["Background Scheduler\n(30s Asynchronous Loop)"]
         JD["Job Registry & Validator\n(job_definitions.py)"]
         CFG["Config & Environment Loader\n(config.py - .env)"]
@@ -73,20 +76,22 @@ flowchart TD
 
     subgraph Storage_Layer["🗄️ Persistence & Storage"]
         SQL["Microsoft SQL Server (DesSy)\nODBC Driver 17"]
-        FILES["Local Reports Cache\n(.xlsx, .txt, .dat)"]
+        FILES["Local Reports Cache\n(D:\\Kerja\\{YYYY} CSSD\\...)"]
     end
 
     TK --> JR
     WEB --> JR
     WEB --> SCH
     SCH --> JR
+    JR --> DO
+    DO --> PR
     JR --> JD
     JR --> CFG
 
-    JR --> P1
-    JR --> P2
-    JR --> P3
-    JR --> P4
+    DO --> P1
+    DO --> P2
+    DO --> P3
+    DO --> P4
 
     P1 --> SU
     P2 --> SU
@@ -114,7 +119,8 @@ flowchart TD
 
 | No | Modul / Job | Script Pelaksana | Deskripsi & Target Data |
 |:---|:---|:---|:---|
-| 1 | **CREATE BG JOB ZSMR007B** | [`rpa_sap_1.py`](file:///D:/Kerja/Application%20AG/SAP%20AUTOMATION/rpa_sap_1.py) | Mengambil equipment dari `Tb_R_SerPervEq`, salin clipboard batch, jadwalkan BG Job di SAP. |
+| ⭐ | **DAILY AUTOMATION PIPELINE (6 Stages)** | [`daily_orchestrator.py`](file:///D:/Kerja/Application%20AG/SAP%20AUTOMATION/daily_orchestrator.py) | **Otomatisasi Harian Terpadu**: Menjalankan 6 Tahap sekaligus secara otomatis dengan auto-folder di `D:\Kerja\`. |
+| 1 | **CREATE BG JOB ZSMR007B** | [`rpa_sap_1.py`](file:///D:/Kerja/Application%20AG/SAP%20AUTOMATION/rpa_sap_1.py) | Mengambil equipment dari `Tb_R_SerPervEq`, salin clipboard batch (1.000 eq/batch), jadwalkan BG Job di SAP. |
 | 2 | **DOWNLOAD BG JOB ZSMR007B** | [`download_zsmr007b.py`](file:///D:/Kerja/Application%20AG/SAP%20AUTOMATION/download_zsmr007b.py) | Mengunduh spool hasil BG Job SAP ke file lokal `*1.txt` & `*2.txt`. |
 | 3 | **MERAPIHKAN HASIL ZSMR007B** | [`process_reports.py`](file:///D:/Kerja/Application%20AG/SAP%20AUTOMATION/process_reports.py) | Membersihkan data, menggabungkan (*inner join* Equipment), dan mengunggah ke tabel `ZSMR007B`. |
 | 4 | **DOWNLOAD LAPORAN KE30 (Divisi)** | [`download_ke30.py`](file:///D:/Kerja/Application%20AG/SAP%20AUTOMATION/download_ke30.py) | Mengunduh laporan Profitability Analysis KE30 seluruh divisi dari SAP GUI. |

@@ -123,8 +123,9 @@ SAP AUTOMATION/
 ├── job_runner.py             # Subprocess execution engine, log streaming & taskkill manager
 ├── dashboard.py              # Desktop UI application (Python Tkinter)
 ├── web_dashboard.py          # Modern Web UI application (FastAPI + SSE streaming)
-├── job_config.json           # User parameter cache (sanitized, NO passwords stored)
-│
+├── daily_orchestrator.py     # Master Daily E2E Pipeline Orchestrator (6 Stages)
+├── path_resolver.py          # Dynamic Astragraphia workspace directory resolver
+├── run_daily.bat             # Standalone / Task Scheduler Windows batch runner
 ├── automate_zsme09e.py       # Pipeline 3: ZSME09E orchestrator & SQL ETL
 ├── download_ke30.py          # Pipeline 2a: KE30 per Divisi SAP downloader
 ├── download_ke30_eq.py       # Pipeline 2b: KE30 per Equipment SAP downloader
@@ -133,7 +134,7 @@ SAP AUTOMATION/
 ├── ProcessKE30byEq.py        # Pipeline 2c: KE30 by Equipment normalizer & SQL ETL
 ├── ProsesKE30byDiv.py        # Pipeline 2d: KE30 by Divisi Excel COM normalizer & SQL ETL
 ├── process_reports.py        # Pipeline 1c: ZSMR007B text combiner & SQL ETL
-├── rpa_sap_1.py              # Pipeline 1a: ZSMR007B Equipment clipboard batch scheduler
+├── rpa_sap_1.py              # Pipeline 1a: ZSMR007B Equipment clipboard batch scheduler (1.000 eq/batch)
 │
 ├── requirements.txt          # Production Python package dependencies
 ├── test_smoke.py             # Automated unit and smoke testing suite

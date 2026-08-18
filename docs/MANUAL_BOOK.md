@@ -17,6 +17,7 @@
 4. [Panduan Menggunakan Desktop Dashboard (Tkinter)](#4-panduan-menggunakan-desktop-dashboard-tkinter)
 5. [Panduan Menggunakan Web Dashboard (Modern Web UI)](#5-panduan-menggunakan-web-dashboard-modern-web-ui)
 6. [Panduan Eksekusi Job & Modul Otomatisasi](#6-panduan-eksekusi-job--modul-otomatisasi)
+   - [6.0 Job Utama: DAILY AUTOMATION PIPELINE (Full 6 Stages)](#60-job-utama-daily-automation-pipeline-full-6-stages)
    - [6.1 Job 1: CREATE BG JOB ZSMR007B – Equipment Batch Clipboard](#61-job-1-create-bg-job-zsmr007b--equipment-batch-clipboard)
    - [6.2 Job 2: DOWNLOAD BG JOB ZSMR007B – SAP Background Job](#62-job-2-download-bg-job-zsmr007b--sap-background-job)
    - [6.3 Job 3: MERAPIHKAN HASIL DOWNLOAD – ZSMR007B](#63-job-3-merapihkan-hasil-download--zsmr007b)
@@ -203,12 +204,31 @@ Setelah server aktif, buka browser favorit Anda (Chrome, Edge, Firefox) dan akse
 
 ## 6. Panduan Eksekusi Job & Modul Otomatisasi
 
+### 6.0 Job Utama: DAILY AUTOMATION PIPELINE (Full 6 Stages)
+- **Fungsi**: Eksekusi terpadu 1-Click yang merantai seluruh 6 tahapan secara otomatis:
+  1. Membuat BG Job ZSMR007B per 1.000 equipment di SAP.
+  2. Download spool ZSMR007B ➔ merge `*1` & `*2` ➔ upsert ke tabel `ZSMR007B`.
+  3. Download KE30 Divisi ➔ Excel COM normalizer ➔ upsert ke tabel `KE30`.
+  4. Download KE30 Equipment ➔ parse composite string ➔ upsert ke tabel `KE30_ByEq`.
+  5. Download ZSME09E Material Movement ➔ upsert ke tabel `ZSME09E`.
+  6. Download ZSMR019 Service Order ➔ upsert ke tabel `ZSMR019`.
+- **Fitur Khusus**:
+  - **Auto Dynamic Workspace Path**: Otomatis mendeteksi dan membuat struktur folder di `D:\Kerja\` (`{YYYY} CSSD`, `02. REPORTING {YYYY}`, `03. KE30`).
+  - **Pre-flight Variable Inspector**: Menampilkan tabel konfirmasi semua path dan closing dates sebelum dieksekusi.
+- **Parameter Utama**:
+  - `Target Periode`: Tanggal periode (Default: auto-detect dari tabel `Tb_R_PeriodeClosing`).
+  - `Base Drive Work`: Root folder kerja (Default: `D:\Kerja`).
+  - `Pilihan Tahap`: Tahapan yang ingin dijalankan (Default: `1,2,3,4,5,6`).
+  - `Batch Size Eq`: Ukuran batch equipment untuk Tahap 1 (Default: `1000`).
+
+---
+
 ### 6.1 Job 1: CREATE BG JOB ZSMR007B – Equipment Batch Clipboard
-- **Fungsi**: Mengambil data nomor Equipment dari database tabel `Tb_R_SerPervEq` untuk periode yang dipilih, membaginya ke dalam batch clipboard, lalu menjadwalkan Background Job di SAP melalui VBScript.
+- **Fungsi**: Mengambil data nomor Equipment dari database tabel `Tb_R_SerPervEq` untuk periode yang dipilih, membaginya ke dalam batch clipboard (1.000 equipment per batch), lalu menjadwalkan Background Job di SAP melalui VBScript.
 - **Parameter Utama**:
   - `Periode`: Tanggal periode data (Format `YYYY-MM-DD`, contoh: `2026-06-01`).
-  - `Max Offset`: Batas atas baris data yang akan diproses (default: `1000`).
-  - `Batch Size`: Jumlah peralatan per batch clipboard (default: `500`).
+  - `Max Offset`: Batas atas baris data (isi `0` untuk memproses seluruh equipment di database).
+  - `Batch Size`: Jumlah peralatan per batch clipboard (default: `1000`).
   - `Delay (detik)`: Jeda waktu istirahat antar batch (default: `10`).
   - `Sched BG Start`: Jam mulai eksekusi Background Job di server SAP (contoh: `18:00`).
 

@@ -467,6 +467,20 @@ def browse_dialog(data: BrowseModel):
         print(f"Error in browse dialog: {e}")
         return {"path": None}
 
+class InspectModel(BaseModel):
+    periode: str = ""
+    base_drive: str = "D:\\Kerja"
+
+@app.post("/api/utils/inspect-variables")
+def inspect_variables_api(data: InspectModel):
+    from path_resolver import resolve_workspace_paths
+    p_val = data.periode.strip() if data.periode else datetime.now().strftime("%Y-%m-%d")
+    paths = resolve_workspace_paths(p_val, base_drive=data.base_drive)
+    return {
+        "periode": p_val,
+        "paths": paths
+    }
+
 @app.get("/api/jobs/stream-log")
 async def stream_log(job_name: str):
     if job_name not in SCRIPTS:

@@ -17,6 +17,7 @@ from datetime import datetime
 # Script lain (rpa_sap_1.py, download_zsmr007b.py, ProcessKE30byEq.py) TIDAK
 # menerima argumen ini — rpa/download membaca kredensial langsung dari .env.
 DB_ARG_SCRIPTS = {
+    "daily_orchestrator.py",
     "process_reports.py",
     "automate_zsme09e.py",
     "ProsesKE30byDiv.py",
@@ -25,13 +26,25 @@ DB_ARG_SCRIPTS = {
 }
 
 SCRIPTS = {
+    "DAILY AUTOMATION PIPELINE – Full 6 Stages": {
+        "file": "daily_orchestrator.py",
+        "desc": "Otomatisasi Harian Terpadu: Menjalankan 6 Tahap (Create BG 007B batch 1.000 eq, Download & Upsert 007B, KE30 Divisi, KE30 Equipment, ZSME09E, ZSMR019) dengan auto-folder D:\\Kerja\\.",
+        "params": [
+            {"arg": "periode",    "label": "Target Periode",  "default": "dynamic-today-ymd", "type": "date", "help": "Format YYYY-MM-DD (Default: auto-detect dari DB)"},
+            {"arg": "base-drive", "label": "Base Drive Work", "default": "D:\\Kerja",        "type": "path", "help": "Root folder kerja Astragraphia"},
+            {"arg": "stages",     "label": "Pilihan Tahap",   "default": "1,2,3,4,5,6",       "type": "str",  "help": "Daftar tahap yang dijalankan (contoh: 1,2,3,4,5,6)"},
+            {"arg": "batch-size", "label": "Batch Size Eq",   "default": "1000",              "type": "int",  "help": "Jumlah equipment per batch untuk Tahap 1"},
+            {"arg": "sch-time",   "label": "Sch Time",        "default": "06:00",             "type": "sch",  "help": "Waktu eksekusi otomatis harian (HH:mm)"},
+            {"arg": "sch-active", "label": "Sch Active",      "default": "False",             "type": "bool", "help": "Aktifkan jadwal otomatis harian"},
+        ],
+    },
     "CREATE BG JOB ZSMR007B – Equipment Batch Clipboard": {
         "file": "rpa_sap_1.py",
         "desc": "Mengambil data EQUIPMENT dari Tb_R_SerPervEq, salin ke Clipboard per-batch, lalu jalankan SecondRecord.vbs.",
         "params": [
             {"arg": "periode",    "label": "Periode",      "default": "2026-01-01", "type": "date", "help": "Format YYYY-MM-DD"},
-            {"arg": "max-offset", "label": "Max Offset",   "default": "1000",       "type": "int",  "help": "Batas atas offset"},
-            {"arg": "batch-size", "label": "Batch Size",   "default": "500",        "type": "int",  "help": "Jumlah per batch"},
+            {"arg": "max-offset", "label": "Max Offset",   "default": "0",          "type": "int",  "help": "Batas atas offset (0 = seluruh data)"},
+            {"arg": "batch-size", "label": "Batch Size",   "default": "1000",       "type": "int",  "help": "Jumlah per batch (default 1.000)"},
             {"arg": "delay",            "label": "Delay (detik)",       "default": "10",         "type": "int",  "help": "Jeda antar iterasi"},
             {"arg": "vbs-path",         "label": "Path VBS",            "default": "vbs\\CreateBG007B-Scheduled.vbs", "type": "path", "help": "Lokasi VBS"},
             {"arg": "sched-start-time", "label": "Sched BG Start", "default": "18:00",      "type": "str",  "help": "Jam mulai jadwal SAP BG Job"},
