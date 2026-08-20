@@ -16,7 +16,8 @@ def main(periode_override: str | None, vbs_path: str, save_path: str):
     except Exception:
         period_tag = datetime.now().strftime("%m%y")
 
-    resolved_save_path = os.path.abspath(save_path)
+    clean_save_path = save_path.strip().strip('"').strip("'").rstrip('\\').rstrip('/')
+    resolved_save_path = os.path.abspath(clean_save_path)
     os.makedirs(resolved_save_path, exist_ok=True)
 
     resolved_vbs = os.path.abspath(vbs_path)

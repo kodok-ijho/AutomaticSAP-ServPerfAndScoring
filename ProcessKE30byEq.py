@@ -14,24 +14,28 @@ from db_utils import (
 
 
 def process_ke30_eq(input_path, periode, insert_sql=False, db_config=None):
+    clean_input = input_path.strip().strip('"').strip("'")
+    if os.path.isdir(clean_input):
+        clean_input = clean_input.rstrip('\\').rstrip('/')
+    
     print(f"Mulai memproses KE30 By Eq")
-    print(f"Input: {input_path}")
+    print(f"Input: {clean_input}")
     print(f"Periode: {periode}")
 
     # Terima 1 file langsung, atau (fallback) sebuah folder berisi banyak .dat
-    if os.path.isfile(input_path):
-        files = [input_path]
-        output_dir = os.path.dirname(os.path.abspath(input_path))
-    elif os.path.isdir(input_path):
-        files = [f for f in glob.glob(os.path.join(input_path, "*.dat"))]
-        output_dir = input_path
+    if os.path.isfile(clean_input):
+        files = [clean_input]
+        output_dir = os.path.dirname(os.path.abspath(clean_input))
+    elif os.path.isdir(clean_input):
+        files = [f for f in glob.glob(os.path.join(clean_input, "*.dat"))]
+        output_dir = clean_input
     else:
-        print(f"Path tidak ditemukan (bukan file maupun folder): {input_path}")
-        return
+        print(f"Path tidak ditemukan (bukan file maupun folder): {clean_input}")
+        return False
 
     if not files:
-        print(f"Tidak ada file .dat untuk diproses di: {input_path}")
-        return
+        print(f"Tidak ada file .dat untuk diproses di: {clean_input}")
+        return False
 
     print(f"Menemukan {len(files)} file untuk diproses.")
     
