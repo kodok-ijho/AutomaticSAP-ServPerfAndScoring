@@ -12,7 +12,7 @@ If IsObject(WScript) Then
    WScript.ConnectObject session,     "on"
    WScript.ConnectObject application, "on"
 End If
-Dim saveFolder, periodTag, fullFilePath
+Dim saveFolder, periodTag, fullFilePath, targetMonth, targetYear
 saveFolder = "D:\Kerja\2026 CSSD\03. KE30\KE30 - 07 JUL 26"
 periodTag = "0726"
 
@@ -27,12 +27,20 @@ If Right(saveFolder, 1) = "\" Then
    saveFolder = Left(saveFolder, Len(saveFolder) - 1)
 End If
 
+targetMonth = Left(periodTag, 2)
+targetYear = "20" & Right(periodTag, 2)
+
 fullFilePath = saveFolder & "\KE30 by EQ - " & periodTag & ".dat"
 
 session.findById("wnd[0]").maximize
 session.findById("wnd[0]/tbar[0]/okcd").text = "/nke30"
 session.findById("wnd[0]").sendVKey 0
+session.findById("wnd[0]/shellcont/shell").selectedNode = "000000001044"
 session.findById("wnd[0]/tbar[1]/btn[8]").press
+session.findById("wnd[0]/usr/ctxtPAR_01").text = targetYear
+session.findById("wnd[0]/usr/ctxtPAR_05").text = targetMonth
+session.findById("wnd[0]/usr/ctxtPAR_05").setFocus
+session.findById("wnd[0]/usr/ctxtPAR_05").caretPosition = 2
 session.findById("wnd[0]/tbar[1]/btn[8]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[22,11]").setFocus
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[22,11]").caretPosition = 0
