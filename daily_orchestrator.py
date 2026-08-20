@@ -340,7 +340,7 @@ def main(
     # 5. Pre-flight Check: Database Connectivity & SAP GUI Login
     print("\n[PRE-FLIGHT] Memeriksa konektivitas Database Server...")
     try:
-        conn = get_connection_with_retry(effective_db, max_retries=2, base_delay=1.0)
+        conn = get_connection_with_retry(effective_db, retries=2, delay=1)
         conn.close()
         print("[PRE-FLIGHT OK] Database SQL Server terhubung.")
     except Exception as db_err:

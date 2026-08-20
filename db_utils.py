@@ -26,6 +26,7 @@ def get_connection_with_retry(
     cfg: dict | None = None,
     retries: int = 3,
     delay: int = 5,
+    **kwargs,
 ) -> "pyodbc.Connection":
     """Buka koneksi pyodbc baru dengan mekanisme retry.
 
@@ -41,6 +42,11 @@ def get_connection_with_retry(
     Raises:
         pyodbc.Error: Jika semua percobaan gagal.
     """
+    if "max_retries" in kwargs:
+        retries = kwargs["max_retries"]
+    if "base_delay" in kwargs:
+        delay = int(kwargs["base_delay"])
+
     effective_cfg = cfg or DB_CONFIG
     conn_str = get_connection_string(effective_cfg)
     last_error = None
