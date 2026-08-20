@@ -149,7 +149,8 @@ def run_stage_2_zsmr007b_etl(periode: str, paths: dict, vbs_dir: str, db_config:
         sql_ok = process_reports.upload_to_sql(combined_all, periode, db_config)
         return sql_ok
     else:
-        print("[ERROR] File *1.txt atau *2.txt tidak ditemukan di folder ZSMR007.")
+        print("[WARN] File spool *1.txt / *2.txt belum tersedia di folder ZSMR007 (belum ada BG job kemarin).")
+        print("[INFO] Melanjutkan proses ke Tahap 3 (KE30 Divisi)...")
         return False
 
 
