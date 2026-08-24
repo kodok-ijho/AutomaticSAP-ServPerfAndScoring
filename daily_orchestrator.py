@@ -18,8 +18,12 @@ from datetime import datetime
 
 from config import DB_CONFIG
 from db_utils import get_connection_with_retry
-from sap_utils import ensure_sap_logged_in, verify_sap_ready, run_vbs
-from path_resolver import resolve_workspace_paths, ensure_workspace_directories, get_smart_spool_date_range
+from path_resolver import (
+    resolve_workspace_paths,
+    ensure_workspace_directories,
+    get_smart_spool_date_range,
+    get_cascading_spool_date_ranges,
+)
 
 # Import ETL helpers directly from pipeline modules for in-process high performance
 import rpa_sap_1
@@ -106,52 +110,66 @@ def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_conf
 
 
 def run_stage_2_zsmr007b_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:
-    """Tahap 2: Mendownload spool ZSMR007B -> merge *1 & *2 -> upsert ke SQL."""
+    """Tahap 2: Mendownload spool ZSMR007B -> merge *1 & *2 -> upsert ke SQL (Cascading Lookback)."""
     print("\n" + "─" * 70)
     print(" ▶ [TAHAP 2/6] DOWNLOAD & UPSERT DATA ZSMR007B KE SQL SERVER")
     print("─" * 70)
     folder = paths["zsmr007b_dir"]
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "DownloadBGJob007B.vbs")
-
-    # 1. Download via VBS dengan smart lookback (H-3 jika hari Senin, H-1 jika hari lain)
-    from_date, to_date = get_smart_spool_date_range()
     save_path_arg = folder.rstrip("\\") + "\\"
 
-    print(f"[STEP 2.1] Menjalankan VBScript download spool: {vbs_path}")
-    print(f"           Rentang Spool: {from_date} s/d {to_date} (Smart Lookback)")
-    vbs_ok = run_vbs(vbs_path, [from_date, to_date, save_path_arg])
-    if not vbs_ok:
-        print("[WARN] Eksekusi VBS download ZSMR007B mengalami kendala. Melanjutkan pemeriksaan file lokal...")
+    # Ambil urutan jendela pencarian bertahap (H-1/H-3 -> H-5 -> H-7)
+    cascading_ranges = get_cascading_spool_date_ranges()
+    spool_found = False
+    df1 = None
+    df2 = None
 
-    # 2. Process reports and merge
-    print(f"[STEP 2.2] Memproses file laporan di {folder}...")
-    df1 = process_reports.process_files(folder, "1")
-    df2 = process_reports.process_files(folder, "2")
+    for attempt_idx, (tier_label, from_date, to_date) in enumerate(cascading_ranges, start=1):
+        print(f"\n[STEP 2.1 - TIER {attempt_idx}] Mencoba rentang {tier_label}: {from_date} s/d {to_date}...")
+        vbs_ok = run_vbs(vbs_path, [from_date, to_date, save_path_arg])
+        if not vbs_ok:
+            print(f"[WARN] VBS download spool selesai dengan status non-zero pada {tier_label}.")
 
-    if df1 is not None and df2 is not None:
-        import pandas as pd
-        df1['Equipment'] = df1['Equipment'].astype(str)
-        df2['Equipment'] = df2['Equipment'].astype(str)
-        combined_all = pd.merge(df1, df2, on="Equipment", how="inner", suffixes=('_1', '_2'))
-        combined_all.insert(0, 'Periode', periode)
+        # Cek apakah ada file *1.txt dan *2.txt yang berhasil diunduh
+        df1 = process_reports.process_files(folder, "1")
+        df2 = process_reports.process_files(folder, "2")
 
-        out_xlsx = os.path.join(folder, f"combine_{datetime.now().strftime('%H%M%S')}.xlsx")
-        out_txt = os.path.join(folder, f"combine_{periode}.txt")
-        try:
-            combined_all.to_excel(out_xlsx, index=False)
-            print(f"[FILE OK] Disimpan ke Excel: {os.path.basename(out_xlsx)}")
-        except Exception:
-            pass
+        if df1 is not None and df2 is not None and len(df1) > 0 and len(df2) > 0:
+            print(f"[SPOOL DITEMUKAN] Berhasil menemukan file spool pada jendela {tier_label}!")
+            spool_found = True
+            break
+        else:
+            if attempt_idx < len(cascading_ranges):
+                print(f"[INFO] Belum ada spool pada {tier_label}. Mencoba jendela berikutnya yang lebih luas...")
+            else:
+                print(f"[INFO] Spool tidak ditemukan hingga rentang maksimal {tier_label}.")
 
-        # Upsert to SQL
-        print(f"[STEP 2.3] Mengupload {len(combined_all):,} baris ke tabel ZSMR007B...")
-        sql_ok = process_reports.upload_to_sql(combined_all, periode, db_config)
-        return sql_ok
-    else:
-        print("[WARN] File spool *1.txt / *2.txt belum tersedia di folder ZSMR007 (belum ada BG job kemarin).")
+    if not spool_found or df1 is None or df2 is None:
+        print("[INFO] Tidak ada file spool ZSMR007B dalam 7 hari terakhir (belum ada BG job).")
         print("[INFO] Melanjutkan proses ke Tahap 3 (KE30 Divisi)...")
         return False
+
+    # 2. Process reports and merge
+    print(f"\n[STEP 2.2] Memproses dan menggabungkan data spool di {folder}...")
+    import pandas as pd
+    df1['Equipment'] = df1['Equipment'].astype(str)
+    df2['Equipment'] = df2['Equipment'].astype(str)
+    combined_all = pd.merge(df1, df2, on="Equipment", how="inner", suffixes=('_1', '_2'))
+    combined_all.insert(0, 'Periode', periode)
+
+    out_xlsx = os.path.join(folder, f"combine_{datetime.now().strftime('%H%M%S')}.xlsx")
+    out_txt = os.path.join(folder, f"combine_{periode}.txt")
+    try:
+        combined_all.to_excel(out_xlsx, index=False)
+        print(f"[FILE OK] Disimpan ke Excel: {os.path.basename(out_xlsx)}")
+    except Exception:
+        pass
+
+    # Upsert to SQL
+    print(f"[STEP 2.3] Mengupload {len(combined_all):,} baris ke tabel ZSMR007B...")
+    sql_ok = process_reports.upload_to_sql(combined_all, periode, db_config)
+    return sql_ok
 
 
 def run_stage_3_ke30_div_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:

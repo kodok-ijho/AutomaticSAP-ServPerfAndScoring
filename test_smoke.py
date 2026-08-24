@@ -15,7 +15,12 @@ import unittest
 from job_definitions import SCRIPTS, build_cli_args, validate_job_config
 from db_utils import clean_sap_number, parse_sap_int, is_sap_numeric, format_sap_number_display
 from job_runner import classify_log_tag, STATUS_IDLE, STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILED
-from path_resolver import resolve_workspace_paths, parse_period_date, get_smart_spool_date_range
+from path_resolver import (
+    resolve_workspace_paths,
+    parse_period_date,
+    get_smart_spool_date_range,
+    get_cascading_spool_date_ranges,
+)
 from datetime import datetime
 
 
@@ -75,6 +80,30 @@ class TestPathResolver(unittest.TestCase):
         from_str, to_str = get_smart_spool_date_range(tuesday_dt)
         self.assertEqual(from_str, "24.08.2026", "Hari Selasa harus mundur 1 hari ke hari Senin (24.08.2026)")
         self.assertEqual(to_str, "25.08.2026")
+
+    def test_cascading_spool_lookback_monday(self):
+        # 2026-08-24 adalah hari Senin
+        monday_dt = datetime(2026, 8, 24)
+        ranges = get_cascading_spool_date_ranges(monday_dt)
+        self.assertEqual(len(ranges), 3)
+        # Tier 1 (H-3 Jumat)
+        self.assertEqual(ranges[0][1], "21.08.2026")
+        self.assertEqual(ranges[0][2], "24.08.2026")
+        # Tier 2 (H-5)
+        self.assertEqual(ranges[1][1], "19.08.2026")
+        self.assertEqual(ranges[1][2], "24.08.2026")
+        # Tier 3 (H-7)
+        self.assertEqual(ranges[2][1], "17.08.2026")
+        self.assertEqual(ranges[2][2], "24.08.2026")
+
+    def test_cascading_spool_lookback_weekday(self):
+        # 2026-08-26 adalah hari Rabu
+        wednesday_dt = datetime(2026, 8, 26)
+        ranges = get_cascading_spool_date_ranges(wednesday_dt)
+        self.assertEqual(len(ranges), 3)
+        # Tier 1 (H-1 Selasa)
+        self.assertEqual(ranges[0][1], "25.08.2026")
+        self.assertEqual(ranges[0][2], "26.08.2026")
 
 
 class TestSAPNumberParsing(unittest.TestCase):

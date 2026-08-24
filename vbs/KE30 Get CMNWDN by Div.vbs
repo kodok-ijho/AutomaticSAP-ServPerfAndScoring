@@ -31,6 +31,13 @@ If Right(saveFolder, 1) = "\" Then
    saveFolder = Left(saveFolder, Len(saveFolder) - 1)
 End If
 
+Dim periodTag, todayTag, d, m, y
+periodTag = Right("0" & targetMonth, 2) & Right(targetYear, 2)
+d = Right("0" & Day(Date), 2)
+m = Right("0" & Month(Date), 2)
+y = Right(Year(Date), 2)
+todayTag = d & m & y
+
 session.findById("wnd[0]").maximize
 session.findById("wnd[0]/tbar[0]/okcd").text = "/nke30"
 session.findById("wnd[0]").sendVKey 0
@@ -62,7 +69,7 @@ session.findById("wnd[4]/usr/ctxtDY_PATH").setFocus
 session.findById("wnd[4]/usr/ctxtDY_PATH").caretPosition = 0
 session.findById("wnd[4]").sendVKey 4
 session.findById("wnd[5]/usr/ctxtDY_PATH").text = saveFolder
-session.findById("wnd[5]/usr/ctxtDY_FILENAME").text = "KE30 CMNWDN - 0626 - 300626 - 11.dat"
+session.findById("wnd[5]/usr/ctxtDY_FILENAME").text = "KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 11.dat"
 session.findById("wnd[5]/usr/ctxtDY_FILENAME").caretPosition = 22
 session.findById("wnd[5]/tbar[0]/btn[0]").press
 session.findById("wnd[4]/tbar[0]/btn[0]").press
@@ -76,7 +83,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/6[0,6]/lbl[1,6]").s
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/6[0,6]/lbl[1,6]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 12.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 12.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -86,7 +93,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/8[0,8]/lbl[1,8]").s
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/8[0,8]/lbl[1,8]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 16.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 16.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -96,7 +103,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/9[0,9]/lbl[1,9]").s
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/9[0,9]/lbl[1,9]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 21.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 21.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]").sendVKey 0
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -106,7 +113,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/10[0,10]/lbl[1,10]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/10[0,10]/lbl[1,10]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 22.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 22.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]").sendVKey 0
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -116,7 +123,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/11[0,11]/lbl[1,11]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/11[0,11]/lbl[1,11]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 23.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 23.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -126,7 +133,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/12[0,12]/lbl[1,12]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/12[0,12]/lbl[1,12]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 24.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 24.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -136,7 +143,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/13[0,13]/lbl[1,13]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/13[0,13]/lbl[1,13]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 25.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 25.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -146,7 +153,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/14[0,14]/lbl[1,14]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/14[0,14]/lbl[1,14]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 26.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 26.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -156,7 +163,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/15[0,15]/lbl[1,15]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/15[0,15]/lbl[1,15]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 27.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 27.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -166,7 +173,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/16[0,16]/lbl[1,16]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/16[0,16]/lbl[1,16]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 31.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 31.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -176,7 +183,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/17[0,17]/lbl[1,17]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/17[0,17]/lbl[1,17]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 32.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 32.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -186,7 +193,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/18[0,18]/lbl[1,18]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/18[0,18]/lbl[1,18]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 33.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 33.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -196,7 +203,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/19[0,19]/lbl[1,19]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/19[0,19]/lbl[1,19]").caretPosition = 2
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 41.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 41.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -206,7 +213,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/20[0,20]/lbl[1,20]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/20[0,20]/lbl[1,20]").caretPosition = 2
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 42.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 42.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -216,7 +223,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/21[0,21]/lbl[1,21]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/21[0,21]/lbl[1,21]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 43.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 43.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -226,7 +233,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/22[0,22]/lbl[1,22]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/22[0,22]/lbl[1,22]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 44.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 44.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -236,7 +243,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/23[0,23]/lbl[1,23]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/23[0,23]/lbl[1,23]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 45.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 45.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -246,7 +253,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/24[0,24]/lbl[1,24]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/24[0,24]/lbl[1,24]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 46.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 46.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -256,7 +263,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/25[0,25]/lbl[1,25]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/25[0,25]/lbl[1,25]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 47.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 47.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -266,7 +273,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/26[0,26]/lbl[1,26]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/26[0,26]/lbl[1,26]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 48.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 48.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -276,7 +283,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/29[0,29]/lbl[1,29]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/29[0,29]/lbl[1,29]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 61.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 61.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -286,7 +293,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/30[0,30]/lbl[1,30]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/30[0,30]/lbl[1,30]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 62.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 62.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -296,7 +303,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/31[0,31]/lbl[1,31]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/31[0,31]/lbl[1,31]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 71.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 71.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -306,7 +313,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/32[0,32]/lbl[1,32]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/32[0,32]/lbl[1,32]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 72.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 72.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -330,7 +337,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/33[0,33]/lbl[1,33]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/33[0,33]/lbl[1,33]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 81.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 81.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -340,7 +347,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/34[0,34]/lbl[1,34]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/34[0,34]/lbl[1,34]").caretPosition = 1
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 82.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 82.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -351,7 +358,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/31[0,31]/lbl[1,31]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/31[0,31]/lbl[1,31]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 83.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 83.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -363,7 +370,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/34[0,34]/lbl[1,34]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/34[0,34]/lbl[1,34]").caretPosition = 0
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 84.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 84.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/usr/sub/1[0,0]/sub/1/4[0,7]/lbl[50,8]").setFocus
@@ -377,7 +384,7 @@ session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/33[0,33]/lbl[1,33]"
 session.findById("wnd[1]/usr/sub/1[0,0]/sub/1/2[0,0]/sub/1/2/33[0,33]/lbl[1,33]").caretPosition = 2
 session.findById("wnd[1]").sendVKey 2
 session.findById("wnd[0]/mbar/menu[0]/menu[11]").select
-session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - 0626 - 300626 - 91.dat"
+session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").text = saveFolder & "\KE30 CMNWDN - " & periodTag & " - " & todayTag & " - 91.dat"
 session.findById("wnd[1]/usr/ctxtCFDOWNLOAD-FILE").caretPosition = 89
 session.findById("wnd[1]/tbar[0]/btn[0]").press
 session.findById("wnd[0]/tbar[0]/btn[3]").press

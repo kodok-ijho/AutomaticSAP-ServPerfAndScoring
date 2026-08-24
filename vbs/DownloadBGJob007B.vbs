@@ -85,13 +85,34 @@ savePath = args(2)
 session.findById("wnd[0]").maximize
 session.findById("wnd[0]/tbar[0]/okcd").text = "/nsm37"
 session.findById("wnd[0]").sendVKey 0
-session.findById("wnd[0]/usr/chkBTCH2170-PRELIM").selected = true
+
+' Filter Status: Hanya cari yang FINISHED
+session.findById("wnd[0]/usr/chkBTCH2170-PRELIM").selected = false
+session.findById("wnd[0]/usr/chkBTCH2170-SCHED").selected  = false
+session.findById("wnd[0]/usr/chkBTCH2170-READY").selected  = false
+session.findById("wnd[0]/usr/chkBTCH2170-RUN").selected    = false
+session.findById("wnd[0]/usr/chkBTCH2170-FINISH").selected = true
+session.findById("wnd[0]/usr/chkBTCH2170-ABORT").selected  = false
+
+' Identitas Job & Rentang Tanggal
 session.findById("wnd[0]/usr/txtBTCH2170-JOBNAME").text = "*007b*"
+session.findById("wnd[0]/usr/txtBTCH2170-USERNAME").text = "*"
 session.findById("wnd[0]/usr/ctxtBTCH2170-FROM_DATE").text = fromDate
 session.findById("wnd[0]/usr/ctxtBTCH2170-TO_DATE").text = toDate
 session.findById("wnd[0]/usr/ctxtBTCH2170-TO_DATE").setFocus
 session.findById("wnd[0]/usr/ctxtBTCH2170-TO_DATE").caretPosition = 2
 session.findById("wnd[0]/tbar[1]/btn[8]").press
+
+' Cek apakah grid hasil ditemukan (jika tidak ada job, keluar dengan aman)
+On Error Resume Next
+rowCount = 0
+rowCount = session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").RowCount
+If Err.Number <> 0 Or rowCount = 0 Then
+    session.findById("wnd[0]/tbar[0]/btn[3]").press
+    WScript.Quit
+End If
+On Error GoTo 0
+
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").setCurrentCell -1,"STRTDATE"
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectColumn "STRTDATE"
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectColumn "STRTTIME"
@@ -110,9 +131,6 @@ Function GetPairCode(index)
     Loop While n >= 0
     GetPairCode = code
 End Function
-
-' Ambil jumlah baris dari layar utama
-rowCount = session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").RowCount
 
 If rowCount > 0 Then
     For i = 0 To rowCount - 1

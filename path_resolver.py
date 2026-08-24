@@ -47,6 +47,37 @@ def get_smart_spool_date_range(ref_date: datetime | None = None) -> tuple[str, s
     return from_dt.strftime("%d.%m.%Y"), today.strftime("%d.%m.%Y")
 
 
+def get_cascading_spool_date_ranges(ref_date: datetime | None = None) -> list[tuple[str, str, str]]:
+    """Menghasilkan daftar rentang tanggal bertahap (tier_label, from_date, to_date)
+    untuk pencarian spool bertingkat (Cascading Lookback):
+    1. Primary : Kemarin (H-1) atau Jumat (H-3 jika Senin)
+    2. Extended: 5 Hari ke Belakang (H-5 - Mengantisipasi Libur/Cuti Bersama)
+    3. Maximum : 7 Hari ke Belakang (H-7 - 1 Minggu Penuh)
+    """
+    today = ref_date or datetime.now()
+    weekday = today.weekday()
+    today_str = today.strftime("%d.%m.%Y")
+
+    if weekday == 0:  # Hari Senin
+        h_primary = today - timedelta(days=3)
+        label_1 = f"H-3 Jumat ({h_primary.strftime('%d.%m.%Y')})"
+    elif weekday == 6:  # Hari Minggu
+        h_primary = today - timedelta(days=2)
+        label_1 = f"H-2 Jumat ({h_primary.strftime('%d.%m.%Y')})"
+    else:
+        h_primary = today - timedelta(days=1)
+        label_1 = f"H-1 Kemarin ({h_primary.strftime('%d.%m.%Y')})"
+
+    h_extended = today - timedelta(days=5)
+    h_max = today - timedelta(days=7)
+
+    return [
+        (label_1, h_primary.strftime("%d.%m.%Y"), today_str),
+        (f"H-5 ({h_extended.strftime('%d.%m.%Y')})", h_extended.strftime("%d.%m.%Y"), today_str),
+        (f"H-7 / 1 Minggu ({h_max.strftime('%d.%m.%Y')})", h_max.strftime("%d.%m.%Y"), today_str),
+    ]
+
+
 def parse_period_date(periode: str | datetime) -> datetime:
     """Konversi input periode (string YYYY-MM-DD atau datetime) ke objek datetime."""
     if isinstance(periode, datetime):
