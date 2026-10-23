@@ -1,7 +1,16 @@
 import subprocess
 import os
+import sys
 import argparse
 from datetime import datetime, timedelta
+
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 from db_utils import get_connection_with_retry
 from sap_utils import run_vbs

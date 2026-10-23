@@ -4,7 +4,7 @@ Dim bNeedLogin
 bNeedLogin = False
 
 Set SapGuiAuto = GetObject("SAPGUI")
-If Err.Number <> 0 Then
+If Err.Number <> 0 Or SapGuiAuto Is Nothing Then
     bNeedLogin = True
 ElseIf SapGuiAuto.GetScriptingEngine.Children.Count = 0 Then
     bNeedLogin = True
@@ -21,7 +21,7 @@ On Error GoTo 0
 If bNeedLogin Then
     Set Shell = CreateObject("WScript.Shell")
     strPath = Left(WScript.ScriptFullName, InStrRev(WScript.ScriptFullName, "\"))
-    Shell.Run "wscript.exe """ & strPath & "LoginSAP.vbs""", 1, True
+    Shell.Run "cscript.exe //Nologo """ & strPath & "LoginSAP.vbs""", 1, True
     Set SapGuiAuto = GetObject("SAPGUI")
 End If
 ' ------------------------------------
@@ -29,12 +29,27 @@ End If
 If Not IsObject(application) Then
    Set application = SapGuiAuto.GetScriptingEngine
 End If
-If Not IsObject(connection) Then
-   Set connection = application.Children(0)
+
+' Cari koneksi dan session yang aktif
+Dim activeConn, activeSess, i, connCheck
+Set activeConn = Nothing
+Set activeSess = Nothing
+For i = 0 To application.Children.Count - 1
+    Set connCheck = application.Children(CInt(i))
+    If connCheck.Children.Count > 0 Then
+        Set activeConn = connCheck
+        Set activeSess = connCheck.Children(0)
+        Exit For
+    End If
+Next
+
+If activeConn Is Nothing Or activeSess Is Nothing Then
+    WScript.Echo "ERROR: Tidak ada session SAP yang aktif!"
+    WScript.Quit 1
 End If
-If Not IsObject(session) Then
-   Set session    = connection.Children(0)
-End If
+
+Set connection = activeConn
+Set session    = activeSess
 
 If IsObject(WScript) Then
    WScript.ConnectObject session,     "on"

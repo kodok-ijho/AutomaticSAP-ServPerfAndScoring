@@ -3,6 +3,14 @@ import glob
 import argparse
 import sys
 
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from config import DB_CONFIG
 from db_utils import (
     get_connection_with_retry,
@@ -27,7 +35,10 @@ def process_ke30_eq(input_path, periode, insert_sql=False, db_config=None):
         files = [clean_input]
         output_dir = os.path.dirname(os.path.abspath(clean_input))
     elif os.path.isdir(clean_input):
-        files = [f for f in glob.glob(os.path.join(clean_input, "*.dat"))]
+        files = sorted(list(dict.fromkeys(
+            glob.glob(os.path.join(clean_input, "*.dat")) + 
+            glob.glob(os.path.join(clean_input, "*.DAT"))
+        )))
         output_dir = clean_input
     else:
         print(f"Path tidak ditemukan (bukan file maupun folder): {clean_input}")
@@ -162,7 +173,9 @@ def upload_to_sql(all_rows, db_config, periode):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perapihan Laporan KE30 by Equipment")
-    parser.add_argument("--file", required=True, help="Path ke 1 file laporan (.dat), atau folder berisi .dat")
+    parser.add_argument("--folder", default="", help="Path ke folder berisi file laporan .dat")
+    parser.add_argument("--file", default="", help="Path ke 1 file laporan (.dat), atau folder")
+    parser.add_argument("--path", default="", help="Path ke file atau folder laporan (.dat)")
     parser.add_argument("--periode", required=True, help="Target periode (contoh format: 2026-04-01)")
     parser.add_argument("--insert-sql", default="False", help="Insert hasil ke SQL Server (True/False)")
     parser.add_argument("--db-server", default=DB_CONFIG["server"])
@@ -171,7 +184,11 @@ if __name__ == "__main__":
     parser.add_argument("--db-name", default=DB_CONFIG["name"])
     args = parser.parse_args()
 
-    insert_sql = args.insert_sql.lower() == "true"
+    target_input = (args.folder or args.file or args.path).strip()
+    if not target_input:
+        parser.error("Harap tentukan argumen --folder atau --file.")
+
+    insert_sql = str(args.insert_sql).strip().lower() in ("true", "1", "yes")
     db_config = {
         'server': args.db_server,
         'user': args.db_user,
@@ -179,4 +196,5 @@ if __name__ == "__main__":
         'db': args.db_name
     }
 
-    process_ke30_eq(args.file, args.periode, insert_sql=insert_sql, db_config=db_config)
+    process_ke30_eq(target_input, args.periode, insert_sql=insert_sql, db_config=db_config)
+

@@ -12,7 +12,16 @@ import sys
 import argparse
 from datetime import datetime, timedelta
 
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from db_utils import get_connection_with_retry
+from sap_utils import run_vbs
 
 
 def main(
@@ -42,15 +51,45 @@ def main(
         cursor = conn.cursor()
         print("[DB OK] Berhasil terhubung ke database.")
 
-        # 1. Ambil StartDate dan EndDate dari Tb_R_PeriodeClosing
-        print(f"[DB] Mengambil rentang tanggal untuk periode: {periode}...")
+        # 1. Resolusi Periode Cerdas (Exact -> Month Start -> Closing Range -> Latest)
+        effective_periode = periode
+        cursor.execute("SELECT COUNT(*) FROM Tb_R_SerPervEq WHERE Periode = ?", (effective_periode,))
+        total_equipments = cursor.fetchone()[0]
+
+        if total_equipments == 0 and len(str(periode)) == 10:
+            month_start = str(periode)[:8] + "01"
+            cursor.execute("SELECT COUNT(*) FROM Tb_R_SerPervEq WHERE Periode = ?", (month_start,))
+            c = cursor.fetchone()[0]
+            if c > 0:
+                effective_periode = month_start
+                total_equipments = c
+                print(f"[RESOLVE] Menggunakan periode bulan {effective_periode} ({total_equipments:,} equipment).")
+
+        if total_equipments == 0:
+            cursor.execute("SELECT Periode FROM Tb_R_PeriodeClosing WHERE ? BETWEEN StartDate AND EndDate", (periode,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                closing_p = str(row[0]).split()[0]
+                cursor.execute("SELECT COUNT(*) FROM Tb_R_SerPervEq WHERE Periode = ?", (closing_p,))
+                c = cursor.fetchone()[0]
+                if c > 0:
+                    effective_periode = closing_p
+                    total_equipments = c
+                    print(f"[RESOLVE] Menggunakan periode closing aktif {effective_periode} ({total_equipments:,} equipment).")
+
+        if total_equipments == 0:
+            print(f"[WARN] Tidak ada data equipment untuk periode {periode}. Proses batch dihentikan.")
+            return 0
+
+        # Ambil StartDate dan EndDate dari Tb_R_PeriodeClosing
+        print(f"[DB] Mengambil rentang tanggal untuk periode: {effective_periode}...")
         query_dates = "SELECT StartDate, EndDate FROM Tb_R_PeriodeClosing WHERE Periode = ?"
-        cursor.execute(query_dates, (periode,))
+        cursor.execute(query_dates, (effective_periode,))
         date_row = cursor.fetchone()
 
         if not date_row or not date_row[0] or not date_row[1]:
-            print(f"[WARN] Tidak ada rentang tanggal di Tb_R_PeriodeClosing untuk periode {periode}. Menggunakan fallback.")
-            dt_p = datetime.strptime(periode, "%Y-%m-%d")
+            print(f"[WARN] Tidak ada rentang tanggal di Tb_R_PeriodeClosing untuk periode {effective_periode}. Menggunakan fallback.")
+            dt_p = datetime.strptime(effective_periode, "%Y-%m-%d")
             start_date_str = dt_p.replace(day=1).strftime("%d%m%y")
             end_date_str = (dt_p.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
             end_date_str = end_date_str.strftime("%d%m%y")
@@ -61,15 +100,7 @@ def main(
             end_date_str = e_dt.strftime("%d%m%y")
 
         print(f"[CLOSING DATES] Rentang Tanggal: {start_date_str} s/d {end_date_str}")
-
-        # Hitung total equipment jika max_offset <= 0
-        cursor.execute("SELECT COUNT(*) FROM Tb_R_SerPervEq WHERE Periode = ?", (periode,))
-        total_equipments = cursor.fetchone()[0]
-        print(f"[DB INFO] Total peralatan di Tb_R_SerPervEq periode {periode}: {total_equipments:,} baris.")
-
-        if total_equipments == 0:
-            print(f"[WARN] Tidak ada data equipment untuk periode {periode}. Proses batch dihentikan.")
-            return 0
+        print(f"[DB INFO] Total peralatan di Tb_R_SerPervEq periode {effective_periode}: {total_equipments:,} baris.")
 
         effective_max = total_equipments if (max_offset <= 0 or max_offset > total_equipments) else max_offset
 
@@ -104,7 +135,7 @@ def main(
                 ORDER BY Equipment
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
             """
-            cursor.execute(query, (periode, offset_counter, batch_size))
+            cursor.execute(query, (effective_periode, offset_counter, batch_size))
             rows = cursor.fetchall()
 
             if not rows:
@@ -127,10 +158,9 @@ def main(
             print(f"[EXEC] Menjalankan VBScript: {resolved_vbs}")
             print(f"       Schedule Date: {sched_date_str} | Batch1: {sched_time1} | Batch2: {sched_time2}")
             
-            subprocess.run(
-                ["wscript.exe", resolved_vbs, start_date_str, end_date_str, sched_date_str, sched_time1, sched_time2],
-                check=True
-            )
+            vbs_ok = run_vbs(resolved_vbs, [start_date_str, end_date_str, sched_date_str, sched_time1, sched_time2])
+            if not vbs_ok:
+                print(f"[WARN] Batch {call_counter + 1} menemui kendala saat eksekusi VBScript.")
             call_counter += 1
             offset_counter += batch_size
 

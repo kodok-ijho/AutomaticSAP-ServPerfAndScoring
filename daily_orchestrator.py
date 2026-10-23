@@ -16,8 +16,17 @@ import argparse
 import traceback
 from datetime import datetime
 
+# Pastikan output stream menggunakan UTF-8 di Windows untuk mencegah UnicodeEncodeError
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from config import DB_CONFIG
 from db_utils import get_connection_with_retry
+from sap_utils import ensure_sap_logged_in, run_vbs
 from path_resolver import (
     resolve_workspace_paths,
     ensure_workspace_directories,
@@ -67,7 +76,7 @@ def get_active_closing_period(db_config: dict | None = None) -> tuple[str, str, 
     return today_p, today_dmy, today_dmy
 
 
-def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[int], db_config: dict) -> None:
+def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[int], db_config: dict, sched_start_time: str = "17:00") -> None:
     """Mencetak tabel inspeksi variabel pre-flight untuk ditinjau oleh operator."""
     spool_from, spool_to = get_smart_spool_date_range()
     print("=" * 80)
@@ -77,7 +86,7 @@ def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[in
     print(f" Root Workspace (CSSD)   : {paths['cssd_root']}")
     print(f" Reporting SS Base       : {paths['reporting_ss']}")
     print(f" Tahapan yang Dipilih    : {', '.join(f'Tahap {s}' for s in stages_to_run)}")
-    print(f" Sched BG Job Jam (Thp 1): 17:00 Sore (Eksekusi Batch di Server SAP)")
+    print(f" Sched BG Job Jam (Thp 1): {sched_start_time} (Eksekusi Batch di Server SAP)")
     print(f" Spool Lookback (Tahap 2): {spool_from} s/d {spool_to} (Auto H-3 jika Senin)")
     print("-" * 80)
     print(f" [Tahap 1 & 2] ZSMR007B  : {paths['zsmr007b_dir']}")
@@ -91,11 +100,11 @@ def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[in
     sys.stdout.flush()
 
 
-def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_config: dict) -> bool:
+def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_config: dict, sched_start_time: str = "17:00") -> bool:
     """Tahap 1: Membuat Background Job ZSMR007B per 1.000 equipment."""
-    print("\n" + "─" * 70)
-    print(f" ▶ [TAHAP 1/6] MEMBUAT BACKGROUND JOB ZSMR007B (Batch {batch_size:,} Eq, Target: 17:00)")
-    print("─" * 70)
+    print("\n" + "-" * 70)
+    print(f" > [TAHAP 1/6] MEMBUAT BACKGROUND JOB ZSMR007B (Batch {batch_size:,} Eq, Target: {sched_start_time})")
+    print("-" * 70)
     vbs_path = os.path.join(vbs_dir, "CreateBG007B-Scheduled.vbs")
     ret = rpa_sap_1.main(
         periode=periode,
@@ -103,7 +112,7 @@ def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_conf
         batch_size=batch_size,
         delay_seconds=10,
         vbs_path=vbs_path,
-        sched_start_time="17:00",
+        sched_start_time=sched_start_time,
         db_config=db_config,
     )
     return ret == 0
@@ -111,9 +120,9 @@ def run_stage_1_zsmr007b_bg(periode: str, batch_size: int, vbs_dir: str, db_conf
 
 def run_stage_2_zsmr007b_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:
     """Tahap 2: Mendownload spool ZSMR007B -> merge *1 & *2 -> upsert ke SQL (Cascading Lookback)."""
-    print("\n" + "─" * 70)
-    print(" ▶ [TAHAP 2/6] DOWNLOAD & UPSERT DATA ZSMR007B KE SQL SERVER")
-    print("─" * 70)
+    print("\n" + "-" * 70)
+    print(" > [TAHAP 2/6] DOWNLOAD & UPSERT DATA ZSMR007B KE SQL SERVER")
+    print("-" * 70)
     folder = paths["zsmr007b_dir"]
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "DownloadBGJob007B.vbs")
@@ -174,9 +183,9 @@ def run_stage_2_zsmr007b_etl(periode: str, paths: dict, vbs_dir: str, db_config:
 
 def run_stage_3_ke30_div_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:
     """Tahap 3: Download KE30 per Divisi -> Excel COM mapping -> upsert ke SQL."""
-    print("\n" + "─" * 70)
-    print(" ▶ [TAHAP 3/6] DOWNLOAD & UPSERT KE30 BY DIVISI KE SQL SERVER")
-    print("─" * 70)
+    print("\n" + "-" * 70)
+    print(" > [TAHAP 3/6] DOWNLOAD & UPSERT KE30 BY DIVISI KE SQL SERVER")
+    print("-" * 70)
     folder = paths["ke30_div_dir"]
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "KE30 Get CMNWDN by Div.vbs")
@@ -203,9 +212,9 @@ def run_stage_3_ke30_div_etl(periode: str, paths: dict, vbs_dir: str, db_config:
 
 def run_stage_4_ke30_eq_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:
     """Tahap 4: Download KE30 per Equipment -> parse Eq -> upsert ke SQL."""
-    print("\n" + "─" * 70)
-    print(" ▶ [TAHAP 4/6] DOWNLOAD & UPSERT KE30 BY EQUIPMENT KE SQL SERVER")
-    print("─" * 70)
+    print("\n" + "-" * 70)
+    print(" > [TAHAP 4/6] DOWNLOAD & UPSERT KE30 BY EQUIPMENT KE SQL SERVER")
+    print("-" * 70)
     folder = paths["ke30_eq_dir"]
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "KE30 Get CMNWDN by Eq.vbs")
@@ -231,9 +240,9 @@ def run_stage_4_ke30_eq_etl(periode: str, paths: dict, vbs_dir: str, db_config: 
 
 def run_stage_5_zsme09e_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:
     """Tahap 5: Download ZSME09E Material Movement -> upsert ke SQL."""
-    print("\n" + "─" * 70)
-    print(" ▶ [TAHAP 5/6] DOWNLOAD & UPSERT ZSME09E (MATERIAL MOVEMENT) KE SQL SERVER")
-    print("─" * 70)
+    print("\n" + "-" * 70)
+    print(" > [TAHAP 5/6] DOWNLOAD & UPSERT ZSME09E (MATERIAL MOVEMENT) KE SQL SERVER")
+    print("-" * 70)
     folder = paths["zsme09e_dir"]
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "DownloadZSME09E.vbs")
@@ -273,9 +282,9 @@ def run_stage_5_zsme09e_etl(periode: str, paths: dict, vbs_dir: str, db_config: 
 
 def run_stage_6_zsmr019_etl(periode: str, paths: dict, vbs_dir: str, db_config: dict) -> bool:
     """Tahap 6: Download ZSMR019 Service Order -> upsert ke SQL."""
-    print("\n" + "─" * 70)
-    print(" ▶ [TAHAP 6/6] DOWNLOAD & UPSERT ZSMR019 (SERVICE ORDER) KE SQL SERVER")
-    print("─" * 70)
+    print("\n" + "-" * 70)
+    print(" > [TAHAP 6/6] DOWNLOAD & UPSERT ZSMR019 (SERVICE ORDER) KE SQL SERVER")
+    print("-" * 70)
     folder = paths["zsmr019_dir"]
     os.makedirs(folder, exist_ok=True)
     vbs_path = os.path.join(vbs_dir, "ZSMR019.vbs")
@@ -317,6 +326,7 @@ def main(
     base_drive: str = "D:\\Kerja",
     stages: str = "1,2,3,4,5,6",
     batch_size: int = 1000,
+    sched_start_time: str = "17:00",
     vbs_dir: str = "vbs",
     dry_run: bool = False,
     db_config: dict | None = None,
@@ -334,23 +344,38 @@ def main(
         db_p, _, _ = get_active_closing_period(effective_db)
         target_periode = db_p
     else:
-        target_periode = periode.strip()
+        p_clean = periode.strip()
+        try:
+            dt = datetime.strptime(p_clean, "%Y-%m-%d")
+            target_periode = dt.strftime("%Y-%m-01")
+        except Exception:
+            target_periode = p_clean
 
     # 2. Resolve Workspace Paths berdasarkan struktur baku Astragraphia
     paths = resolve_workspace_paths(target_periode, base_drive=base_drive)
     ensure_workspace_directories(paths)
 
-    # 3. Parse stages
+    # 3. Parse stages fleksibel (mis. '2,3,4,5,6', '2-6', '2;3;4', '2 3 4')
     stages_to_run = []
-    for s in stages.split(","):
-        s_clean = s.strip()
-        if s_clean.isdigit():
-            stages_to_run.append(int(s_clean))
+    raw_stages = str(stages).replace(";", ",").replace(" ", ",")
+    for part in [p.strip() for p in raw_stages.split(",") if p.strip()]:
+        if "-" in part:
+            sub = part.split("-")
+            if len(sub) == 2 and sub[0].strip().isdigit() and sub[1].strip().isdigit():
+                start_s, end_s = int(sub[0].strip()), int(sub[1].strip())
+                for num in range(start_s, end_s + 1):
+                    if 1 <= num <= 6 and num not in stages_to_run:
+                        stages_to_run.append(num)
+        elif part.isdigit():
+            num = int(part)
+            if 1 <= num <= 6 and num not in stages_to_run:
+                stages_to_run.append(num)
     if not stages_to_run:
         stages_to_run = [1, 2, 3, 4, 5, 6]
+    stages_to_run.sort()
 
     # 4. Print Pre-Flight Inspection
-    print_preflight_inspection(target_periode, paths, stages_to_run, effective_db)
+    print_preflight_inspection(target_periode, paths, stages_to_run, effective_db, sched_start_time=sched_start_time)
 
     if dry_run:
         print("\n[DRY RUN] Mode inspeksi aktif. Validasi variabel selesai tanpa eksekusi SAP.")
@@ -368,11 +393,37 @@ def main(
         return 1
 
     vbs_login = os.path.join(vbs_dir, "LoginSAP.vbs")
-    print("[PRE-FLIGHT] Memeriksa status login SAP GUI...")
-    if not ensure_sap_logged_in(vbs_login):
-        print("[CRITICAL] SAP GUI belum siap / login gagal. Otomatisasi dibatalkan.")
-        print("[HINT] Pastikan SAP Logon sudah dibuka dan user/password di .env sudah benar.")
-        return 1
+    vbs_check = os.path.join(vbs_dir, "CheckSAPStatus.vbs")
+    print("\n[PRE-FLIGHT] Memeriksa SAP GUI Login...")
+
+    # Cek apakah SAP sudah login (via CheckSAPStatus.vbs)
+    if ensure_sap_logged_in(vbs_login):
+        print("[PRE-FLIGHT OK] SAP GUI sudah login dan siap.")
+    else:
+        # SAP tidak terdeteksi — coba launch saplogon.exe lalu tunggu user login
+        saplogon_exe = r"C:\Program Files (x86)\SAP\FrontEnd\SapGui\saplogon.exe"
+        if os.path.exists(saplogon_exe):
+            print("[PRE-FLIGHT] SAP Logon belum terbuka — membuka SAP Logon otomatis...")
+            import subprocess as _sp
+            _sp.Popen([saplogon_exe])
+            print("[PRE-FLIGHT] Menunggu 5 detik untuk SAP Logon terbuka...")
+            time.sleep(5)
+            # Coba login sekali lagi
+            if not ensure_sap_logged_in(vbs_login, timeout=90, max_retries=2):
+                print("\n[PRE-FLIGHT ABORT] SAP GUI tidak dapat dimulai atau tidak merespons.")
+                print("=" * 70)
+                print("[SOLUSI]:")
+                print("  1. Buka aplikasi SAP Logon secara manual (saplogon.exe).")
+                print("  2. Double-click koneksi 'SAP HANA AGDS PROD'.")
+                print("  3. Login dengan user/password SAP Anda sampai masuk layar SAP Easy Access.")
+                print("  4. Jalankan kembali pipeline dari Dashboard.")
+                print("=" * 70)
+                return 1
+        else:
+            print(f"\n[PRE-FLIGHT ABORT] saplogon.exe tidak ditemukan di: {saplogon_exe}")
+            print("[HINT] Pastikan SAP GUI for Windows sudah terinstall dan buka SAP Logon secara manual.")
+            return 1
+
 
     start_total_time = time.time()
     results = {}
@@ -380,7 +431,7 @@ def main(
     # 6. Eksekusi Tahap demi Tahap
     if 1 in stages_to_run:
         t0 = time.time()
-        ok = run_stage_1_zsmr007b_bg(target_periode, batch_size, vbs_dir, effective_db)
+        ok = run_stage_1_zsmr007b_bg(target_periode, batch_size, vbs_dir, effective_db, sched_start_time=sched_start_time)
         results[1] = {"name": "Create BG Job ZSMR007B", "ok": ok, "time": time.time() - t0}
 
     if 2 in stages_to_run:
@@ -441,6 +492,7 @@ if __name__ == "__main__":
     parser.add_argument("--base-drive", default="D:\\Kerja", help="Base drive folder kerja (Default: D:\\Kerja)")
     parser.add_argument("--stages", default="1,2,3,4,5,6", help="Tahapan yang dijalankan (contoh: 1,2,3,4,5,6)")
     parser.add_argument("--batch-size", type=int, default=1000, help="Jumlah equipment per batch (default 1.000)")
+    parser.add_argument("--sched-start-time", default="17:00", help="Jam eksekusi Background Job SAP Tahap 1 (contoh: 10:00 atau 17:00)")
     parser.add_argument("--vbs-dir", default="vbs", help="Folder lokasi script VBScript")
     parser.add_argument("--dry-run", action="store_true", help="Inspeksi variabel pre-flight tanpa eksekusi SAP")
 
@@ -466,6 +518,7 @@ if __name__ == "__main__":
         base_drive=args.base_drive,
         stages=args.stages,
         batch_size=args.batch_size,
+        sched_start_time=args.sched_start_time,
         vbs_dir=args.vbs_dir,
         dry_run=args.dry_run,
         db_config=db_cfg,

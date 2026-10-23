@@ -1,3 +1,4 @@
+On Error Resume Next
 If Not IsObject(application) Then
    Set SapGuiAuto  = GetObject("SAPGUI")
    Set application = SapGuiAuto.GetScriptingEngine

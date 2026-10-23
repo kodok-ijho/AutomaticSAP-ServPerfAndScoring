@@ -1,0 +1,128 @@
+{
+  "name": "Daily SAP ZSMR012 - Create BG Job & Upsert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "10000000-0000-0000-0000-000000000001",
+      "name": "Schedule Trigger (Daily)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper dua digit (01, 02, dst)\nconst pad = (n) => String(n).padStart(2, '0');\n\n// 1. Tanggal Hari Ini (End Date)\nconst now = new Date();\nconst endYear = now.getFullYear();\nconst endMonth = pad(now.getMonth() + 1);\nconst endDate = pad(now.getDate());\n\n// 2. Tanggal 15 Hari Lalu (Start Date)\nconst past = new Date(now.getTime() - (15 * 24 * 60 * 60 * 1000));\nconst startYear = past.getFullYear();\nconst startMonth = pad(past.getMonth() + 1);\nconst startDate = pad(past.getDate());\n\n// 3. Waktu Mulai Jadwal SAP (Sekarang + 1 Menit)\nconst schedTimeObj = new Date(now.getTime() + (1 * 60 * 1000));\nconst schedHour = pad(schedTimeObj.getHours());\nconst schedMin = pad(schedTimeObj.getMinutes());\n\n// Format YYYY-MM-DD\nconst end_date_ymd = `${endYear}-${endMonth}-${endDate}`;\nconst start_date_ymd = `${startYear}-${startMonth}-${startDate}`;\n\n// Format dd.MM.yyyy untuk SM37\nconst end_date_dmy = `${endDate}.${endMonth}.${endYear}`;\nconst start_date_dmy = `${startDate}.${startMonth}.${startYear}`;\n\nconst sched_start_time = `${schedHour}:${schedMin}`;\n\nreturn [{\n  json: {\n    start_date_ymd,\n    end_date_ymd,\n    start_date_dmy,\n    end_date_dmy,\n    sched_start_date: end_date_ymd,\n    sched_start_time,\n    chunk_days: 15\n  }\n}];"
+      },
+      "id": "10000000-0000-0000-0000-000000000002",
+      "name": "Calculate Date Range (15 Days)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cd /d \"D:\\Kerja\\Application AG\\SAP AUTOMATION\" && python schedule_zsmr012.py --start-date {{ $json.start_date_ymd }} --end-date {{ $json.end_date_ymd }} --chunk-days 15 --sched-start-date {{ $json.sched_start_date }} --sched-start-time {{ $json.sched_start_time }} --interval-minutes 1 --delay-seconds 1 --vbs-path \"vbs\\ZSMR012-per 5 hari.vbs\""
+      },
+      "id": "10000000-0000-0000-0000-000000000003",
+      "name": "Create SAP BG Job ZSMR012",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "minutes"
+      },
+      "id": "10000000-0000-0000-0000-000000000004",
+      "name": "Wait 2 Minutes (SAP Processing)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cd /d \"D:\\Kerja\\Application AG\\SAP AUTOMATION\" && python download_zsmr012.py --to-date {{ $('Calculate Date Range (15 Days)').item.json.end_date_dmy }} --from-date {{ $('Calculate Date Range (15 Days)').item.json.end_date_dmy }} --job-name ZAGDSM_R00012 --file-prefix ZSMR012_ --vbs-path \"vbs\\DownloadBGJob_ZSMR012.vbs\" --insert-sql True"
+      },
+      "id": "10000000-0000-0000-0000-000000000005",
+      "name": "Download Spool & Upsert ZSMR012",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Calculate Date Range (15 Days)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Date Range (15 Days)": {
+      "main": [
+        [
+          {
+            "node": "Create SAP BG Job ZSMR012",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create SAP BG Job ZSMR012": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Minutes (SAP Processing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Minutes (SAP Processing)": {
+      "main": [
+        [
+          {
+            "node": "Download Spool & Upsert ZSMR012",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

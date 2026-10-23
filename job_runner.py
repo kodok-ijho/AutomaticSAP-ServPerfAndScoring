@@ -21,6 +21,14 @@ import subprocess
 from datetime import datetime
 from typing import Callable
 
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from job_definitions import SCRIPTS, build_cli_args
 
 
@@ -100,30 +108,24 @@ def build_job_command(
 #  Stop Job
 # ---------------------------------------------------------------------------
 
-def stop_job(pid: int) -> bool:
-    """Hentikan proses beserta seluruh anak prosesnya (mis. wscript.exe SAP).
-
-    Menggunakan ``taskkill /F /T /PID`` agar subprocess tree ikut dihentikan.
-
-    Args:
-        pid: Process ID yang akan dihentikan.
-
-    Returns:
-        True jika taskkill berhasil, False jika gagal.
-    """
+def stop_job(proc: subprocess.Popen | None) -> None:
+    """Hentikan subprocess yang sedang berjalan beserta child-nya."""
+    if proc is None:
+        return
     try:
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True,
-        )
-        return True
-    except Exception as e:
-        print(f"[JOB_RUNNER] Gagal taskkill PID {pid}: {e}")
-        return False
+        pid = proc.pid
+        if pid:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                capture_output=True,
+                check=False,
+            )
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
-#  Sync Runner (untuk desktop dashboard)
+#  Sync Runner (Desktop / Thread)
 # ---------------------------------------------------------------------------
 
 def run_job(
@@ -172,21 +174,28 @@ def run_job(
     cmd_display = f"python {info['file']} " + " ".join(extra_args)
 
     _log("HEADER",
-         f"{'─' * 62}\n"
+         f"{'-' * 62}\n"
          f"  JOB    : {name}\n"
          f"  START  : {start_time}\n"
          f"  CMD    : {cmd_display}\n"
-         f"{'─' * 62}")
+         f"{'-' * 62}")
 
     ok = True
     proc = None
     try:
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
+
         proc = subprocess.Popen(
             full_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=os.path.dirname(script_path),
+            env=child_env,
         )
         if on_proc_started:
             on_proc_started(proc)
@@ -206,11 +215,11 @@ def run_job(
             on_proc_ended()
 
     end_time = datetime.now().strftime("%H:%M:%S")
-    result = "SUCCESS ✓" if ok else "FAILED ✗"
+    result = "SUCCESS [OK]" if ok else "FAILED [ERROR]"
 
     _log("HEADER",
-         f"{'─' * 62}\n"
+         f"{'-' * 62}\n"
          f"  SELESAI: {result}   pukul {end_time}\n"
-         f"{'─' * 62}")
+         f"{'-' * 62}")
 
     return ok

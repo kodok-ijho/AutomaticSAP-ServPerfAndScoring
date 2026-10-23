@@ -10,6 +10,14 @@ import sys
 from datetime import datetime
 from contextlib import asynccontextmanager
 
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from config import DB_CONFIG
 from job_definitions import SCRIPTS, resolve_default, build_cli_args, validate_job_config
 from sap_utils import get_sap_status
@@ -17,6 +25,8 @@ from job_runner import (
     build_job_command, classify_log_tag, stop_job as jr_stop_job,
     STATUS_IDLE, STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILED,
 )
+import scheduler_utils
+from custom_sequence_runner import resolve_dynamic_params, resolve_dynamic_value
 
 # Config File
 CONFIG_FILE = "job_config.json"
@@ -96,14 +106,19 @@ async def run_job_async(name: str, params: dict = None):
     
     info = SCRIPTS[name]
     cmd_display = f"python {info['file']} " + " ".join(extra_args)
-    log_line(name, "HEADER", f"{'─'*62}\n  JOB    : {name}\n  START  : {start_time}\n  CMD    : {cmd_display}\n{'─'*62}")
+    log_line(name, "HEADER", f"{'-'*62}\n  JOB    : {name}\n  START  : {start_time}\n  CMD    : {cmd_display}\n{'-'*62}")
     
     try:
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
+
         proc = await asyncio.create_subprocess_exec(
             *full_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
-            cwd=os.path.dirname(script_path)
+            cwd=os.path.dirname(script_path),
+            env=child_env
         )
         active_jobs[name]["proc"] = proc
         active_jobs[name]["pid"] = proc.pid
@@ -112,7 +127,7 @@ async def run_job_async(name: str, params: dict = None):
             line_bytes = await proc.stdout.readline()
             if not line_bytes:
                 break
-            line = line_bytes.decode('utf-8', errors='ignore').rstrip()
+            line = line_bytes.decode('utf-8', errors='replace').rstrip()
             if not line:
                 continue
             
@@ -127,7 +142,7 @@ async def run_job_async(name: str, params: dict = None):
         ok = False
         
     end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    result = "SUCCESS ✓" if ok else "FAILED ✗"
+    result = "SUCCESS [OK]" if ok else "FAILED [ERROR]"
     status_str = STATUS_SUCCESS if ok else STATUS_FAILED
     
     active_jobs[name]["status"] = status_str
@@ -135,7 +150,7 @@ async def run_job_async(name: str, params: dict = None):
     active_jobs[name].pop("proc", None)
     active_jobs[name].pop("pid", None)
     
-    log_line(name, "HEADER", f"{'─'*62}\n  SELESAI: {result}   pukul {end_time}\n{'─'*62}")
+    log_line(name, "HEADER", f"{'-'*62}\n  SELESAI: {result}   pukul {end_time}\n{'-'*62}")
     
     if name in listeners:
         for q in list(listeners[name]):
@@ -161,14 +176,22 @@ async def scheduler_loop():
             for name, info in SCRIPTS.items():
                 job_config = config.get(name, {})
                 sch_time = job_config.get("sch-time")
+                sch_day = job_config.get("sch-day")
                 sch_active = job_config.get("sch-active")
                 
                 if sch_time is None:
                     sch_time = next((p["default"] for p in info["params"] if p["arg"] == "sch-time"), "")
+                if sch_day is None:
+                    sch_day = next((p["default"] for p in info["params"] if p["arg"] == "sch-day"), "*")
                 if sch_active is None:
                     sch_active = next((p["default"] for p in info["params"] if p["arg"] == "sch-active"), "False")
                 
-                if str(sch_active).lower() == "true" and sch_time == current_hm:
+                day_match = True
+                if sch_day and str(sch_day).strip() not in ("*", "ALL", "all", "—", ""):
+                    target_days = [d.strip().lstrip("0") for d in str(sch_day).split(",") if d.strip()]
+                    day_match = str(now.day) in target_days
+
+                if str(sch_active).lower() == "true" and day_match and sch_time == current_hm:
                     if last_triggered.get(name) != current_date_hm:
                         is_running = name in active_jobs and active_jobs[name]["status"] == STATUS_RUNNING
                         if not is_running:
@@ -515,6 +538,60 @@ async def stream_log(job_name: str):
                 del listeners[job_name]
                 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ── Windows Task Scheduler API Endpoints ────────────────────────────────────────
+
+class SchedulerRunRequest(BaseModel):
+    task_name: str
+
+class SchedulerStateRequest(BaseModel):
+    task_name: str
+    enable: bool
+
+class SchedulerDeleteRequest(BaseModel):
+    task_name: str
+
+class SchedulerRegisterRequest(BaseModel):
+    task_name: str
+    target_cmd: str
+    run_time: str = "08:00"
+    description: str = ""
+
+@app.get("/api/scheduler/tasks")
+async def get_scheduler_tasks():
+    """Mengambil daftar task SAP Automation dari Windows Task Scheduler."""
+    return scheduler_utils.list_sap_tasks()
+
+@app.post("/api/scheduler/run")
+async def run_scheduler_task(req: SchedulerRunRequest):
+    """Memicu eksekusi task Windows Task Scheduler."""
+    ok, msg = scheduler_utils.run_task(req.task_name)
+    return {"success": ok, "message": msg}
+
+@app.post("/api/scheduler/state")
+async def set_scheduler_state(req: SchedulerStateRequest):
+    """Mengaktifkan atau menonaktifkan task di Windows Task Scheduler."""
+    ok, msg = scheduler_utils.set_task_state(req.task_name, enable=req.enable)
+    return {"success": ok, "message": msg}
+
+@app.post("/api/scheduler/delete")
+async def delete_scheduler_task(req: SchedulerDeleteRequest):
+    """Menghapus task dari Windows Task Scheduler."""
+    ok, msg = scheduler_utils.delete_task(req.task_name)
+    return {"success": ok, "message": msg}
+
+@app.post("/api/scheduler/register")
+async def register_scheduler_task(req: SchedulerRegisterRequest):
+    """Mendaftarkan task harian baru ke Windows Task Scheduler."""
+    ok, msg = scheduler_utils.register_daily_task(
+        task_name=req.task_name,
+        target_cmd=req.target_cmd,
+        run_time=req.run_time,
+        description=req.description,
+    )
+    return {"success": ok, "message": msg}
+
 
 if __name__ == "__main__":
     import uvicorn

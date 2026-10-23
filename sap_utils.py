@@ -9,8 +9,17 @@ Ditambah fungsi baru:
 """
 
 import os
+import sys
 import subprocess
 import time
+
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +102,24 @@ def get_sap_status() -> dict:
     return result
 
 
+def get_cscript_cmd() -> str:
+    """Gunakan 32-bit cscript jika ada di SysWOW64 untuk kompatibilitas SAP GUI 32-bit."""
+    syswow64 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "SysWOW64", "cscript.exe")
+    if os.path.isfile(syswow64):
+        return syswow64
+    return "cscript.exe"
+
+
+def get_wscript_cmd() -> str:
+    """Gunakan 32-bit wscript jika ada di SysWOW64 untuk kompatibilitas SAP GUI 32-bit."""
+    syswow64 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "SysWOW64", "wscript.exe")
+    if os.path.isfile(syswow64):
+        return syswow64
+    return "wscript.exe"
+
+
 # ---------------------------------------------------------------------------
-#  SAP GUI Check — versi sederhana (bool), untuk script CLI
+#  SAP GUI Check — versi andal via VBScript COM
 # ---------------------------------------------------------------------------
 
 def verify_sap_ready() -> bool:
@@ -103,82 +128,46 @@ def verify_sap_ready() -> bool:
     Mengembalikan True hanya bila: SAP GUI berjalan, ada koneksi+session,
     dan session TIDAK berada di layar login.
     """
+    vbs_check = os.path.abspath(os.path.join(os.path.dirname(__file__), "vbs", "CheckSAPStatus.vbs"))
+    if not os.path.exists(vbs_check):
+        vbs_check = os.path.abspath(os.path.join("vbs", "CheckSAPStatus.vbs"))
     try:
-        import win32com.client
-        sap = win32com.client.GetObject("SAPGUI")
-        app = sap.GetScriptingEngine
-    except Exception:
-        print("[ERROR] SAP GUI tidak aktif. Buka SAP GUI dan login terlebih dahulu.")
-        return False
-
-    print("[OK] SAP GUI aktif.")
-
-    try:
-        if app.Children.Count == 0:
-            print("[ERROR] SAP GUI aktif tapi belum ada koneksi. Buka koneksi & login dulu.")
-            return False
-        conn = app.Children(0)
-        # Pastikan scripting tidak diblokir server
-        try:
-            if bool(conn.DisabledByServer):
-                print("[ERROR] Scripting diblokir server (DisabledByServer=True). Hubungi Basis.")
-                return False
-        except Exception:
-            pass
-        if conn.Children.Count == 0:
-            print("[ERROR] Belum ada session SAP. Login terlebih dahulu.")
-            return False
-        sess = conn.Children(0)
-        try:
-            sess.findById("wnd[0]/usr/txtRSYST-BNAME")
-            print("[ERROR] SAP masih di layar login. Login terlebih dahulu, lalu jalankan ulang.")
-            return False
-        except Exception:
-            print("[OK] SAP sudah login.")
+        cscript_exe = get_cscript_cmd()
+        res = subprocess.run([cscript_exe, "//Nologo", vbs_check], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            print("[OK] SAP GUI aktif dan sudah login.")
             return True
+        else:
+            out = res.stdout.strip()
+            if "LOGIN_SCREEN" in out:
+                print("[INFO] SAP terbuka tapi masih di layar login.")
+            elif "NO_CONN" in out or "NO_SESS" in out:
+                print("[INFO] SAP Logon terbuka tapi belum ada session koneksi aktif.")
+            else:
+                print(f"[INFO] SAP GUI belum login ({out or 'tidak ada respon'}).")
+            return False
     except Exception as e:
-        print(f"[ERROR] Gagal mengecek status SAP: {e}")
+        print(f"[WARN] Pengecekan status SAP: {e}")
         return False
 
 
 def check_sap_login() -> bool:
-    """Mengecek apakah ada session SAP yang BENAR-BENAR sudah login.
-
-    Catatan: session yang masih berada di layar login (field username
-    'wnd[0]/usr/txtRSYST-BNAME' masih ada) dianggap BELUM login.
-    """
-    try:
-        import win32com.client
-        sap_gui = win32com.client.GetObject("SAPGUI")
-        application = sap_gui.GetScriptingEngine
-        if application.Children.Count > 0:
-            connection = application.Children(0)
-            if connection.Children.Count > 0:
-                session = connection.Children(0)
-                try:
-                    # Kalau field username masih ada -> masih di layar login.
-                    session.findById("wnd[0]/usr/txtRSYST-BNAME")
-                    print("[INFO] SAP terbuka tapi masih di layar login (belum login).")
-                    return False
-                except Exception:
-                    print("[INFO] SAP sudah terlogin.")
-                    return True
-    except Exception:
-        pass
-    print("[INFO] SAP belum login.")
-    return False
+    """Mengecek apakah ada session SAP yang BENAR-BENAR sudah login."""
+    return verify_sap_ready()
 
 
 # ---------------------------------------------------------------------------
 #  VBS Runner
 # ---------------------------------------------------------------------------
 
-def run_vbs(vbs_path: str, args: list | None = None) -> bool:
+def run_vbs(vbs_path: str, args: list | None = None, interactive: bool = False) -> bool:
     """Menjalankan file VBS dengan argumen.
 
-    Menggunakan subprocess.run dengan daftar argumen (shell=False) agar:
-    - Path dengan spasi tidak perlu di-quote manual.
-    - Tidak ada risiko shell injection dari nilai argumen.
+    Args:
+        vbs_path: Path ke file VBS.
+        args: Argumen tambahan.
+        interactive: Jika True, gunakan wscript.exe (bisa menampilkan jendela GUI),
+                     Jika False, gunakan cscript.exe //Nologo (background, output ke stdout).
     """
     if args is None:
         args = []
@@ -188,15 +177,29 @@ def run_vbs(vbs_path: str, args: list | None = None) -> bool:
         return False
 
     try:
-        # Argumen sebagai list — wscript.exe menangani path dan args langsung,
-        # tanpa perlu shell=True atau quoting manual.
-        cmd = ["wscript.exe", full_path] + [str(a) for a in args]
-        print(f"[VBS] Command: {' '.join(cmd)}")
-        started = time.time()
-        subprocess.run(cmd, check=True)
-        print(f"[VBS] Selesai dalam {time.time() - started:.1f} detik.")
-        return True
-    except subprocess.CalledProcessError as e:
+        if interactive:
+            # wscript.exe: bisa membuka GUI window (SAP Logon), tapi tidak ada stdout capture
+            cmd = [get_wscript_cmd(), full_path] + [str(a) for a in args]
+            print(f"[VBS] Command (interactive): {' '.join(cmd)}")
+            started = time.time()
+            res = subprocess.run(cmd, capture_output=False, timeout=120)
+            print(f"[VBS] Selesai dalam {time.time() - started:.1f} detik (Exit Code: {res.returncode}).")
+            return res.returncode == 0
+        else:
+            # cscript.exe: tidak bisa membuka GUI window baru, tapi stdout ter-capture
+            cmd = [get_cscript_cmd(), "//Nologo", full_path] + [str(a) for a in args]
+            print(f"[VBS] Command: {' '.join(cmd)}")
+            started = time.time()
+            res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            if res.stdout and res.stdout.strip():
+                for line in res.stdout.strip().splitlines():
+                    print(f"[VBS OUT] {line}")
+            if res.stderr and res.stderr.strip():
+                for line in res.stderr.strip().splitlines():
+                    print(f"[VBS ERR] {line}")
+            print(f"[VBS] Selesai dalam {time.time() - started:.1f} detik (Exit Code: {res.returncode}).")
+            return res.returncode == 0
+    except Exception as e:
         print(f"[ERROR] Gagal menjalankan {vbs_path}: {e}")
         return False
 
@@ -273,7 +276,9 @@ def ensure_sap_logged_in(
 
     for attempt in range(1, max_retries + 1):
         print(f"[SAP] Mencoba login... ({attempt}/{max_retries}) via {vbs_login_path}")
-        login_ok = run_vbs(vbs_login_path)
+        # PENTING: gunakan wscript.exe (interactive=True) agar jendela SAP Logon
+        # bisa tampil di layar pengguna. cscript.exe tidak bisa membuka GUI window baru.
+        login_ok = run_vbs(vbs_login_path, interactive=True)
         if not login_ok:
             print(f"[SAP] [Attempt {attempt}/{max_retries}] Gagal menjalankan VBS login.")
             if attempt < max_retries:
@@ -282,14 +287,12 @@ def ensure_sap_logged_in(
             return False
 
         print(f"[SAP] VBS login selesai. Menunggu SAP aktif (timeout {timeout}s)...")
+        # Polling via CheckSAPStatus.vbs (cscript) untuk konfirmasi login berhasil
         poll_interval = 2
         elapsed = 0
         while elapsed < timeout:
             time.sleep(poll_interval)
             elapsed += poll_interval
-
-            # Cek dan tangani jika ada dialog popup multi-login
-            handle_multi_login_popup()
 
             if check_sap_login():
                 print(f"[SAP] Login berhasil pada percobaan ke-{attempt} (setelah ~{elapsed}s).")

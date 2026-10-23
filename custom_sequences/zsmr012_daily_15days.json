@@ -1,0 +1,38 @@
+{
+  "name": "ZSMR012_Daily_15Days",
+  "description": "Otomatisasi Harian ZSMR012: Buat BG Job (H-15 s/d Hari ini) -> Tunggu 2 Menit -> Download Spool & Auto Upsert SQL",
+  "items": [
+    {
+      "type": "job",
+      "name": "CREATE BG JOB ZSMR012 – Split N Hari Scheduler",
+      "params": {
+        "start-date": "dynamic-15-days-ago-ymd",
+        "end-date": "dynamic-today-ymd",
+        "chunk-days": "15",
+        "sched-start-date": "dynamic-today-ymd",
+        "sched-start-time": "dynamic-now-plus-1m",
+        "interval-minutes": "1",
+        "delay-seconds": "1",
+        "vbs-path": "vbs\\ZSMR012-per 5 hari.vbs"
+      }
+    },
+    {
+      "type": "wait",
+      "name": "⏳ JEDA WAKTU (WAIT)",
+      "seconds": 120,
+      "desc": "Menunggu proses Background Job ZSMR012 di server SAP selesai (2 menit)"
+    },
+    {
+      "type": "job",
+      "name": "DOWNLOAD BG JOB ZSMR012 – SAP Background Job",
+      "params": {
+        "from-date": "dynamic-today-dmy",
+        "to-date": "dynamic-today-dmy",
+        "job-name": "ZAGDSM_R00012",
+        "file-prefix": "ZSMR012_",
+        "vbs-path": "vbs\\DownloadBGJob_ZSMR012.vbs",
+        "insert-sql": "True"
+      }
+    }
+  ]
+}

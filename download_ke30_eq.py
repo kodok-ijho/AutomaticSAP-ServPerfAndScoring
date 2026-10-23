@@ -1,7 +1,19 @@
 import subprocess
 import os
+import sys
 import argparse
 from datetime import datetime
+
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+from sap_utils import run_vbs
 
 
 def main(periode_override: str | None, vbs_path: str, save_path: str):
@@ -35,16 +47,11 @@ def main(periode_override: str | None, vbs_path: str, save_path: str):
         return
 
     print(f"\n[EXEC] Menjalankan VBScript: {resolved_vbs}")
-    try:
-        subprocess.run(
-            ["wscript.exe", resolved_vbs, period_tag, resolved_save_path],
-            check=True
-        )
+    ok = run_vbs(resolved_vbs, [period_tag, resolved_save_path])
+    if ok:
         print("[SUCCESS] Proses download KE30 By Eq via SAP GUI VBScript telah selesai.")
-    except subprocess.CalledProcessError as e:
-        print(f"[ERROR] Eksekusi VBScript gagal dengan returncode {e.returncode}")
-    except Exception as e:
-        print(f"[ERROR] Gagal menjalankan VBScript: {e}")
+    else:
+        print("[ERROR] Eksekusi VBScript KE30 By Eq gagal.")
 
 
 if __name__ == "__main__":

@@ -6,6 +6,14 @@ import argparse
 import traceback
 from datetime import datetime
 
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from config import DB_CONFIG, get_connection_string
 from sap_utils import verify_sap_ready, run_vbs
 from db_utils import (
@@ -336,7 +344,10 @@ def main():
         print(f"[CONFIG] StartDate (DB): {start_date} -> {from_date_sap}")
         print(f"[CONFIG] EndDate   (DB): {end_date} -> {to_date_sap}")
 
-        file_full_path = os.path.abspath(os.path.join(args.save_path, download_filename))
+        clean_save_path = os.path.abspath(args.save_path)
+        os.makedirs(clean_save_path, exist_ok=True)
+
+        file_full_path = os.path.abspath(os.path.join(clean_save_path, download_filename))
         before_snapshot = file_snapshot(file_full_path)
         print_file_snapshot("Sebelum VBS", before_snapshot)
         backup_existing_file(file_full_path)
@@ -345,7 +356,7 @@ def main():
         print(f"         > From Date: {from_date_sap}")
         print(f"         > To Date  : {to_date_sap}")
         print(f"         > Output   : {file_full_path}")
-        if not run_vbs(args.vbs_path, [from_date_sap, to_date_sap, args.save_path, download_filename]):
+        if not run_vbs(args.vbs_path, [from_date_sap, to_date_sap, clean_save_path, download_filename]):
             print("[CRITICAL] Gagal mengeksekusi proses SAP.")
             return 1
 

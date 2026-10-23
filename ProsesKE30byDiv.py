@@ -3,6 +3,14 @@ import glob
 import argparse
 import sys
 
+# Pastikan output stream menggunakan UTF-8 di Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from config import DB_CONFIG
 from db_utils import (
     delete_by_periode,
