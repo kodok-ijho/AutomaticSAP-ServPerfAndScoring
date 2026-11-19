@@ -50,8 +50,8 @@ Memeriksa bahwa tidak ada rahasia/password dalam diff yang belum di-commit, men-
 **Deskripsi:**
 Mendorong (*push*) seluruh commit lokal (termasuk 8 commit fitur ZSMR012 sebelumnya + commit baru) ke remote GitHub.
 
-- [ ] 1. Jalankan `git push origin main`.
-- [ ] 2. Verifikasi output perintah `git push` mengonfirmasi transfer objek berhasil tanpa error.
+- [x] 1. Jalankan `git push origin main`.
+- [x] 2. Verifikasi output perintah `git push` mengonfirmasi transfer objek berhasil tanpa error.
 
 ---
 
@@ -63,5 +63,5 @@ Mendorong (*push*) seluruh commit lokal (termasuk 8 commit fitur ZSMR012 sebelum
 **Deskripsi:**
 Memastikan working tree berada dalam kondisi bersih dan HEAD lokal sinkron dengan `origin/main`.
 
-- [ ] 1. Jalankan `git status` dan pastikan pesan `Your branch is up to date with 'origin/main'`.
-- [ ] 2. Periksa `git log -1` untuk memverifikasi commit hash terakhir.
+- [x] 1. Jalankan `git status` dan pastikan pesan `Your branch is up to date with 'origin/main'`.
+- [x] 2. Periksa `git log -1` untuk memverifikasi commit hash terakhir.
