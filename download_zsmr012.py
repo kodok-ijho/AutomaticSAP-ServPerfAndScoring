@@ -11,6 +11,7 @@ Alur Kerja:
 
 import os
 import sys
+import time
 import glob
 import argparse
 from datetime import datetime, timedelta
@@ -71,6 +72,8 @@ def main(
     insert_sql: bool | str = False,
     dry_run: bool = False,
     db_config: dict | None = None,
+    retry_count: int = 8,
+    retry_delay: int = 30,
 ) -> int:
     resolved_from, resolved_to = resolve_dates(from_date, to_date)
 
@@ -87,6 +90,9 @@ def main(
     # Pastikan direktori berakhiran backslash untuk SAP GUI
     effective_save_path = os.path.abspath(os.path.expandvars(effective_save_path)).rstrip("\\") + "\\"
 
+    max_attempts = max(1, int(retry_count))
+    delay_sec = max(5, int(retry_delay))
+
     print("=" * 68)
     print("  [JOB] DOWNLOAD BG JOB ZSMR012 – SAP Background Job")
     print(f"  Job Name SM37      : {job_name}")
@@ -94,6 +100,7 @@ def main(
     print(f"  Folder Simpan      : {effective_save_path}")
     print(f"  Prefix File Output : {file_prefix}")
     print(f"  VBS Path           : {vbs_path}")
+    print(f"  Max Polling/Retry  : {max_attempts}x (Jeda {delay_sec} detik)")
     print(f"  Mode Simulasi      : {'YA (Dry Run)' if dry_run else 'TIDAK (Eksekusi SAP Langsung)'}")
     print("=" * 68)
 
@@ -140,29 +147,43 @@ def main(
         print("[ERROR] SAP GUI belum siap atau gagal login otomatis. Proses dibatalkan.")
         return 1
 
-    # Eksekusi VBScript
-    print(f"\n[EXEC] Menjalankan VBScript: {resolved_vbs}")
+    # Eksekusi VBScript dengan Polling Loop sampai spool FINISHED ditemukan
     vbs_args = [resolved_from, resolved_to, effective_save_path, job_name, file_prefix]
-    vbs_ok = run_vbs(resolved_vbs, vbs_args, interactive=False)
+    matching_files = []
 
-    if not vbs_ok:
-        print("[ERROR] Eksekusi VBScript download ZSMR012 gagal atau menemui kendala.")
-        return 1
+    for attempt in range(1, max_attempts + 1):
+        if max_attempts > 1:
+            print(f"\n[EXEC] Menjalankan VBScript SM37 (Percobaan {attempt}/{max_attempts}): {resolved_vbs}")
+        else:
+            print(f"\n[EXEC] Menjalankan VBScript SM37: {resolved_vbs}")
+
+        vbs_ok = run_vbs(resolved_vbs, vbs_args, interactive=False)
+        if not vbs_ok:
+            print(f"[WARN] VBScript download ZSMR012 mengembalikan status non-zero pada percobaan {attempt}.")
+
+        # Periksa apakah ada file teks yang terunduh dan berukuran > 0 byte
+        if os.path.exists(effective_save_path):
+            all_files = os.listdir(effective_save_path)
+            matching_files = [
+                f for f in all_files
+                if f.startswith(file_prefix) and f.endswith(".txt") and os.path.getsize(os.path.join(effective_save_path, f)) > 0
+            ]
+
+        if matching_files:
+            print(f"[FOUND OK] Berhasil mengunduh {len(matching_files)} file spool ZSMR012 pada percobaan ke-{attempt}!")
+            break
+
+        if attempt < max_attempts:
+            print(f"[POLLING] Spool FINISHED belum siap di SM37. Menunggu {delay_sec} detik sebelum cek ulang...")
+            time.sleep(delay_sec)
+        else:
+            print(f"[TIMEOUT] Setelah {max_attempts} percobaan (total {max_attempts * delay_sec} detik), tidak ditemukan background job FINISHED di SM37.")
+            print("          Kemungkinan background job di SAP masih antre/running atau tidak ada transaksi.")
+            return 0
 
     # Validasi file hasil download
     print(f"\n[VALIDASI] Memeriksa hasil export spool di: {effective_save_path}")
     try:
-        all_files = os.listdir(effective_save_path)
-        matching_files = [
-            f for f in all_files
-            if f.startswith(file_prefix) and f.endswith(".txt")
-        ]
-        
-        if not matching_files:
-            print(f"[WARN] Tidak ditemukan file dengan prefix '{file_prefix}' di {effective_save_path}.")
-            print("       Kemungkinan tidak ada spool baru untuk kriteria SM37 ini.")
-            return 0
-
         valid_files = []
         for f in matching_files:
             f_path = os.path.join(effective_save_path, f)
@@ -228,6 +249,10 @@ if __name__ == "__main__":
                         help="Target periode YYYY-MM-DD (opsional)")
     parser.add_argument("--insert-sql", default="False",
                         help="Upload data ke database DesSy setelah download selesai (True/False)")
+    parser.add_argument("--retry-count", type=int, default=8,
+                        help="Jumlah percobaan polling status FINISHED di SM37 (default: 8)")
+    parser.add_argument("--retry-delay", type=int, default=30,
+                        help="Jeda detik antar percobaan polling (default: 30 detik)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Simulasikan parameter tanpa menjalankan VBScript SAP")
 
@@ -259,5 +284,7 @@ if __name__ == "__main__":
         insert_sql=args.insert_sql,
         dry_run=args.dry_run,
         db_config=db_cfg,
+        retry_count=args.retry_count,
+        retry_delay=args.retry_delay,
     )
     sys.exit(exit_code)

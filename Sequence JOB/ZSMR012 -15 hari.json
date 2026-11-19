@@ -1,0 +1,53 @@
+{
+  "name": "ZSMR012 -15 hari",
+  "description": "Custom sequence template ZSMR012 -15 hari",
+  "items": [
+    {
+      "type": "job",
+      "name": "CREATE BG JOB ZSMR012 – Split N Hari Scheduler",
+      "params": {
+        "start-date": "dynamic-today-ymd",
+        "end-date": "dynamic-15-days-ago-dmy",
+        "chunk-days": "15",
+        "sched-start-date": "dynamic-today-ymd",
+        "sched-start-time": "dynamic-now-plus-1m",
+        "interval-minutes": "1",
+        "delay-seconds": "1",
+        "vbs-path": "vbs\\ZSMR012-per 5 hari.vbs",
+        "sch-time": "08:00",
+        "sch-active": "False"
+      }
+    },
+    {
+      "type": "wait",
+      "name": "⏳ JEDA WAKTU (WAIT)",
+      "seconds": 300,
+      "desc": "Menunggu proses Background Job di server SAP selesai"
+    },
+    {
+      "type": "job",
+      "name": "DOWNLOAD BG JOB ZSMR012 – SAP Background Job",
+      "params": {
+        "to-date": "19.10.2026",
+        "from-date": "18.10.2026",
+        "job-name": "ZAGDSM_R00012",
+        "save-path": "D:\\Kerja\\2026 CSSD\\02. REPORTING 2026\\10 OCT 2026 REPORTING\\Temp\\ZSMR012 Temp\\",
+        "file-prefix": "ZSMR012_",
+        "vbs-path": "vbs\\DownloadBGJob_ZSMR012.vbs",
+        "insert-sql": "True",
+        "retry-count": "8",
+        "retry-delay": "30",
+        "sch-time": "07:15",
+        "sch-active": "False"
+      }
+    },
+    {
+      "type": "job",
+      "name": "MERAPIHKAN HASIL DOWNLOAD – ZSMR012",
+      "params": {
+        "folder": "D:\\Kerja\\2026 CSSD\\02. REPORTING 2026\\10 OCT 2026 REPORTING\\",
+        "periode": "2026-10-15"
+      }
+    }
+  ]
+}

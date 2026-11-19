@@ -687,7 +687,10 @@ class SAPDashboard(tk.Tk):
 
         self._detail_vars["desc"].set(info["desc"])
         self._render_param_form(name)
-        self._set_badge(STATUS_IDLE)
+        if running_jobs.get(name):
+            self._set_badge(STATUS_RUNNING)
+        else:
+            self._set_badge(STATUS_IDLE)
 
     def _set_badge(self, state: str):
         badges = {
@@ -767,13 +770,29 @@ class SAPDashboard(tk.Tk):
     def _stop_selected(self):
         name = self._selected_job
         proc = self._procs.get(name)
+
+        # Jika job yang dipilih tidak sedang running, cari job yang saat ini sedang aktif
         if not running_jobs.get(name) or proc is None:
-            messagebox.showinfo("Info", "Tidak ada job yang sedang berjalan untuk dihentikan.")
-            return
+            active_running = [j for j, is_run in running_jobs.items() if is_run and self._procs.get(j)]
+            if active_running:
+                name = active_running[0]
+                proc = self._procs.get(name)
+            else:
+                messagebox.showinfo("Info", "Tidak ada job yang sedang berjalan untuk dihentikan.")
+                return
+
         if not messagebox.askyesno("Stop Job", f"Hentikan job '{name}'?"):
             return
+
         log_queue.put(("WARN", f"Menghentikan job '{name}' atas permintaan pengguna…"))
-        jr_stop_job(proc.pid)
+        jr_stop_job(proc)
+
+        running_jobs[name] = False
+        self._procs.pop(name, None)
+        ts_stop = datetime.now().strftime("%H:%M:%S")
+        self._update_tree_status(name, STATUS_DISPLAY[STATUS_FAILED], ts_stop, STATUS_FAILED)
+        self._set_badge(STATUS_FAILED)
+        self._status_var.set(f"Job dihentikan paksa: {name} pukul {ts_stop}")
 
     # ── Eksekusi Job ──────────────────────────────────────────────────────────
     def _execute_selected(self):
@@ -1317,7 +1336,11 @@ class RegisterTaskSchedulerDialog(tk.Toplevel):
             return
 
         # Target perintah dieksekusi oleh Windows Task Scheduler
-        target_cmd = f'python custom_sequence_runner.py --sequence-file "custom_sequences\\{file_name}"'
+        bat_runner = os.path.abspath("run_zsmr012_daily.bat")
+        if os.path.exists(bat_runner) and "zsmr012" in file_name.lower():
+            target_cmd = f'"{bat_runner}"'
+        else:
+            target_cmd = f'python custom_sequence_runner.py --sequence-file "custom_sequences\\{file_name}"'
 
         ok, msg = scheduler_utils.register_daily_task(
             task_name=task_name,

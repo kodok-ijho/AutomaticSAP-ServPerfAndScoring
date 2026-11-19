@@ -84,7 +84,7 @@ def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[in
     print("=" * 80)
     print(f" Target Periode           : {periode}")
     print(f" Root Workspace (CSSD)   : {paths['cssd_root']}")
-    print(f" Reporting SS Base       : {paths['reporting_ss']}")
+    print(f" Wadah Harian Pipeline   : {paths.get('auto_root')}")
     print(f" Tahapan yang Dipilih    : {', '.join(f'Tahap {s}' for s in stages_to_run)}")
     print(f" Sched BG Job Jam (Thp 1): {sched_start_time} (Eksekusi Batch di Server SAP)")
     print(f" Spool Lookback (Tahap 2): {spool_from} s/d {spool_to} (Auto H-3 jika Senin)")
@@ -96,6 +96,11 @@ def print_preflight_inspection(periode: str, paths: dict, stages_to_run: list[in
     print(f" [Tahap 6] ZSMR019       : {paths['zsmr019_dir']} (File: {paths['zsmr019_filename']})")
     print("-" * 80)
     print(f" Database Server         : {db_config['server']} / Database: {db_config.get('name') or db_config.get('db')}")
+    if 1 in stages_to_run and 2 in stages_to_run:
+        print("-" * 80)
+        print(" [CATATAN ALUR] Tahap 1 mendaftarkan job background ke server SAP.")
+        print("                Jika job di SAP belum selesai saat Tahap 2 berjalan, Tahap 2 otomatis")
+        print("                berstatus [WAITING/MENUNGGU SAP] dan dapat ditarik ulang nanti (Pilihan Tahap: 2).")
     print("=" * 80)
     sys.stdout.flush()
 
@@ -155,9 +160,11 @@ def run_stage_2_zsmr007b_etl(periode: str, paths: dict, vbs_dir: str, db_config:
                 print(f"[INFO] Spool tidak ditemukan hingga rentang maksimal {tier_label}.")
 
     if not spool_found or df1 is None or df2 is None:
-        print("[INFO] Tidak ada file spool ZSMR007B dalam 7 hari terakhir (belum ada BG job).")
-        print("[INFO] Melanjutkan proses ke Tahap 3 (KE30 Divisi)...")
-        return False
+        print("\n[INFO] Belum ada file spool ZSMR007B yang berstatus FINISHED di SAP.")
+        print("       (Kondisi normal jika job baru dijadwalkan / masih dalam antrean eksekusi di server SAP).")
+        print("       Anda dapat menarik data ZSMR007B nanti setelah job selesai dengan memilih [Pilihan Tahap: 2].")
+        print("[INFO] Melanjutkan proses ke Tahap berikutnya...")
+        return "pending"
 
     # 2. Process reports and merge
     print(f"\n[STEP 2.2] Memproses dan menggabungkan data spool di {folder}...")
@@ -436,8 +443,11 @@ def main(
 
     if 2 in stages_to_run:
         t0 = time.time()
-        ok = run_stage_2_zsmr007b_etl(target_periode, paths, vbs_dir, effective_db)
-        results[2] = {"name": "Download & Upsert ZSMR007B", "ok": ok, "time": time.time() - t0}
+        res_s2 = run_stage_2_zsmr007b_etl(target_periode, paths, vbs_dir, effective_db)
+        if res_s2 == "pending":
+            results[2] = {"name": "Download & Upsert ZSMR007B", "ok": True, "status": "pending", "time": time.time() - t0}
+        else:
+            results[2] = {"name": "Download & Upsert ZSMR007B", "ok": bool(res_s2), "status": "ok" if res_s2 else "error", "time": time.time() - t0}
 
     if 3 in stages_to_run:
         t0 = time.time()
@@ -468,9 +478,15 @@ def main(
     print(f" [SUMMARY] RINGKASAN AKHIR EKSEKUSI PIPELINE HARIAN (Periode: {target_periode})")
     print("=" * 80)
     all_success = True
+    has_pending = False
     for stage_num, res in results.items():
-        status_badge = "[OK] SUKSES" if res["ok"] else "[ERROR] GAGAL"
-        if not res["ok"]:
+        if res.get("status") == "pending":
+            status_badge = "[WAITING] MENUNGGU SAP (Job Belum Selesai)"
+            has_pending = True
+        elif res["ok"]:
+            status_badge = "[OK] SUKSES"
+        else:
+            status_badge = "[ERROR] GAGAL"
             all_success = False
         print(f" [Tahap {stage_num}] {res['name']:<35} : {status_badge} ({res['time']:.1f}s)")
 
@@ -481,6 +497,9 @@ def main(
         print(f"   * Tabel [{tbl:<12}] : {cnt_str}")
     print("-" * 80)
     print(f" Total Waktu Eksekusi: {total_duration:.1f} detik ({total_duration/60:.2f} menit)")
+    if has_pending and all_success:
+        print("\n [CATATAN KHUSUS]: Seluruh laporan langsung berhasil diunggah. Khusus Tahap 2 (ZSMR007B)")
+        print("                   dapat ditarik kembali nanti setelah job di SAP selesai (Pilihan Tahap: 2).")
     print("=" * 80)
 
     return 0 if all_success else 1

@@ -184,6 +184,8 @@ SCRIPTS = {
             {"arg": "file-prefix",  "label": "File Prefix",       "default": "ZSMR012_",               "type": "str",  "help": "Awalan nama file output (misal ZSMR012_)"},
             {"arg": "vbs-path",     "label": "Path VBS",          "default": "vbs\\DownloadBGJob_ZSMR012.vbs", "type": "path", "help": "Lokasi VBS download ZSMR012"},
             {"arg": "insert-sql",   "label": "Upload SQL DesSy",  "default": "True",                  "type": "bool", "help": "Upload data ke database DesSy setelah download"},
+            {"arg": "retry-count",  "label": "Max Retry Cek SM37", "default": "8",                     "type": "int",  "help": "Jumlah percobaan polling status FINISHED di SM37"},
+            {"arg": "retry-delay",  "label": "Jeda Retry (detik)", "default": "30",                    "type": "int",  "help": "Jeda detik antar pengecekan status di SM37"},
             {"arg": "sch-time",     "label": "Sch Time",          "default": "07:15",                 "type": "sch",  "help": "Waktu eksekusi otomatis (HH:mm)"},
             {"arg": "sch-active",   "label": "Sch Active",        "default": "False",                 "type": "bool", "help": "Aktifkan jadwal otomatis"},
         ],

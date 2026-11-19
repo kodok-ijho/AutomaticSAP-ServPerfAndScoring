@@ -108,18 +108,36 @@ def build_job_command(
 #  Stop Job
 # ---------------------------------------------------------------------------
 
-def stop_job(proc: subprocess.Popen | None) -> None:
-    """Hentikan subprocess yang sedang berjalan beserta child-nya."""
+def stop_job(proc: subprocess.Popen | int | str | None) -> None:
+    """Hentikan subprocess yang sedang berjalan beserta seluruh child process-nya (Process Tree)."""
     if proc is None:
         return
     try:
-        pid = proc.pid
-        if pid:
+        # Dukung objek Popen maupun integer/str PID secara fleksibel
+        if hasattr(proc, "pid"):
+            pid = proc.pid
+        else:
+            pid = int(proc)
+
+        if pid and pid > 0:
+            # 1. Hentikan pohon proses Windows secara paksa (/F = Force, /T = Tree)
             subprocess.run(
                 ["taskkill", "/F", "/T", "/PID", str(pid)],
                 capture_output=True,
                 check=False,
             )
+
+        # 2. Jika objek Popen, lakukan kill dan tutup stdout pipe agar unblock seketika
+        if hasattr(proc, "kill"):
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        if hasattr(proc, "stdout") and proc.stdout and not proc.stdout.closed:
+            try:
+                proc.stdout.close()
+            except Exception:
+                pass
     except Exception:
         pass
 

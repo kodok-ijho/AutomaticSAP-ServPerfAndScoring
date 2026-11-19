@@ -97,54 +97,93 @@ def parse_period_date(periode: str | datetime) -> datetime:
     return datetime.now()
 
 
-def resolve_workspace_paths(periode: str | datetime, base_drive: str = "D:\\Kerja") -> dict:
+def _has_any_files(path: str) -> bool:
+    """Mengecek apakah direktori ada dan berisi minimal 1 file nyata (bukan hanya folder kosong)."""
+    if not os.path.exists(path):
+        return False
+    try:
+        for root, dirs, files in os.walk(path):
+            if files:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def resolve_workspace_paths(
+    periode: str | datetime,
+    base_drive: str = "D:\\Kerja",
+    tgl_penarikan: str | datetime | None = None,
+    auto_folder_override: str | None = None,
+) -> dict:
     """Menghasilkan pemetaan path lengkap untuk seluruh kebutuhan otomatisasi SAP.
 
+    Struktur Folder Terpusat Harian:
+      D:\\Kerja\\{YYYY} CSSD\\02. REPORTING {YYYY}\\{MM} {MMM} {YYYY} REPORTING\\Automatic-{ddMMyy}\\
+      - ZSMR007\\
+      - KE30_Div\\
+      - KE30_Eq\\
+      - ZSME09E\\
+      - ZSMR019\\
+      - ZSMR012\\
+      - IW58\\
+      - IW73\\
+
+    Jika folder Automatic-{ddMMyy} sudah ada dan telah berisi file (misal re-run di hari yang sama),
+    maka sistem secara otomatis menambahkan timestamp jam-menit:
+      Automatic-{ddMMyy}_{HHmm}\\
+
     Args:
-        periode: Tanggal periode target (contoh: '2026-06-01' atau datetime).
+        periode: Tanggal periode target (contoh: '2026-10-01' atau datetime).
         base_drive: Root drive kerja (default: 'D:\\Kerja').
+        tgl_penarikan: Tanggal eksekusi/penarikan data (default: hari ini).
+        auto_folder_override: Path kustom folder Automatic (opsional).
 
     Returns:
-        dict dengan kunci path lengkap:
-          - yyyy, yy, mm, mmm, mmyy
-          - cssd_root
-          - reporting_ss
-          - zsmr007b_dir
-          - zsme09e_dir
-          - zsmr019_dir
-          - zsmr019_filename
-          - ke30_root
-          - ke30_div_dir
-          - ke30_eq_dir
-          - ke30_eq_raw_filename
-          - ke30_eq_combined_filename
+        dict dengan pemetaan path lengkap.
     """
     dt = parse_period_date(periode)
     yyyy = dt.strftime("%Y")        # "2026"
     yy = dt.strftime("%y")          # "26"
-    mm = dt.strftime("%m")          # "06"
+    mm = dt.strftime("%m")          # "10"
     month_int = dt.month
-    mmm = MONTH_MAP_EN.get(month_int, dt.strftime("%b").upper())  # "JUN"
-    mmyy = dt.strftime("%m%y")      # "0626"
-    ddmmyy_today = datetime.now().strftime("%d%m%y")
+    mmm = MONTH_MAP_EN.get(month_int, dt.strftime("%b").upper())  # "OCT"
+    mmyy = dt.strftime("%m%y")      # "1026"
+
+    run_dt = parse_period_date(tgl_penarikan) if tgl_penarikan else datetime.now()
+    tgl_tag = run_dt.strftime("%d%m%y")  # misal: "301026"
 
     cssd_root = os.path.join(base_drive, f"{yyyy} CSSD")
     reporting_dir_name = f"{mm} {mmm} {yyyy} REPORTING"
-    reporting_root = os.path.join(cssd_root, f"02. REPORTING {yyyy}", reporting_dir_name, "SS")
+    reporting_month_root = os.path.join(cssd_root, f"02. REPORTING {yyyy}", reporting_dir_name)
+    reporting_root = os.path.join(reporting_month_root, "SS")  # Tetap ada sebagai backward reference
 
-    zsmr007b_dir = os.path.join(reporting_root, "ZSMR007")
-    zsme09e_dir = os.path.join(reporting_root, "ZSME09E")
-    zsmr012_dir = os.path.join(reporting_root, "ZSMR012")
-    iw58_dir = os.path.join(reporting_root, "IW58")
-    iw73_dir = os.path.join(reporting_root, "IW73")
-    zsmr019_dir = reporting_root
-    zsmr019_filename = f"ZSMR019 - {mmyy} - {ddmmyy_today}.txt"
+    if auto_folder_override:
+        auto_root = os.path.abspath(auto_folder_override)
+    else:
+        base_auto_name = f"Automatic-{tgl_tag}"
+        candidate_dir = os.path.join(reporting_month_root, base_auto_name)
+        # Proteksi re-run: jika sudah ada file di dalamnya, tambahkan suffix jam-menit _HHmm
+        if _has_any_files(candidate_dir):
+            time_suffix = datetime.now().strftime("%H%M")
+            auto_root = os.path.join(reporting_month_root, f"{base_auto_name}_{time_suffix}")
+        else:
+            auto_root = candidate_dir
+
+    zsmr007b_dir = os.path.join(auto_root, "ZSMR007")
+    ke30_div_dir = os.path.join(auto_root, "KE30_Div")
+    ke30_eq_dir = os.path.join(auto_root, "KE30_Eq")
+    zsme09e_dir = os.path.join(auto_root, "ZSME09E")
+    zsmr019_dir = os.path.join(auto_root, "ZSMR019")
+    zsmr012_dir = os.path.join(auto_root, "ZSMR012")
+    iw58_dir = os.path.join(auto_root, "IW58")
+    iw73_dir = os.path.join(auto_root, "IW73")
+
+    zsmr019_filename = f"ZSMR019 - {mmyy} - {tgl_tag}.txt"
 
     ke30_month_dir = f"KE30 - {mm} {mmm} {yy}"
     ke30_root = os.path.join(cssd_root, "03. KE30", ke30_month_dir)
-    ke30_div_dir = os.path.join(ke30_root, "AUTO", "BY DIV")
-    ke30_eq_dir = ke30_root
-    ke30_eq_raw_filename = f"CMNW by EQ-{mmyy}-{ddmmyy_today}.dat"
+    ke30_eq_raw_filename = f"CMNW by EQ-{mmyy}-{tgl_tag}.dat"
     ke30_eq_combined_filename = f"Combined_KE30_ByEq_{dt.strftime('%Y-%m-%d')}.txt"
 
     return {
@@ -153,18 +192,21 @@ def resolve_workspace_paths(periode: str | datetime, base_drive: str = "D:\\Kerj
         "mm": mm,
         "mmm": mmm,
         "mmyy": mmyy,
+        "tgl_tag": tgl_tag,
         "cssd_root": os.path.abspath(cssd_root),
+        "reporting_month_root": os.path.abspath(reporting_month_root),
         "reporting_ss": os.path.abspath(reporting_root),
+        "auto_root": os.path.abspath(auto_root),
         "zsmr007b_dir": os.path.abspath(zsmr007b_dir),
+        "ke30_div_dir": os.path.abspath(ke30_div_dir),
+        "ke30_eq_dir": os.path.abspath(ke30_eq_dir),
         "zsme09e_dir": os.path.abspath(zsme09e_dir),
+        "zsmr019_dir": os.path.abspath(zsmr019_dir),
         "zsmr012_dir": os.path.abspath(zsmr012_dir),
         "iw58_dir": os.path.abspath(iw58_dir),
         "iw73_dir": os.path.abspath(iw73_dir),
-        "zsmr019_dir": os.path.abspath(zsmr019_dir),
         "zsmr019_filename": zsmr019_filename,
         "ke30_root": os.path.abspath(ke30_root),
-        "ke30_div_dir": os.path.abspath(ke30_div_dir),
-        "ke30_eq_dir": os.path.abspath(ke30_eq_dir),
         "ke30_eq_raw_filename": ke30_eq_raw_filename,
         "ke30_eq_combined_filename": ke30_eq_combined_filename,
     }
@@ -172,7 +214,18 @@ def resolve_workspace_paths(periode: str | datetime, base_drive: str = "D:\\Kerj
 
 def ensure_workspace_directories(paths: dict) -> None:
     """Membuat direktori kerja jika belum ada di disk."""
-    for key in ("zsmr007b_dir", "zsme09e_dir", "zsmr012_dir", "iw58_dir", "iw73_dir", "zsmr019_dir", "ke30_div_dir", "ke30_eq_dir", "scoring_ytdn_dir"):
+    for key in (
+        "auto_root",
+        "zsmr007b_dir",
+        "ke30_div_dir",
+        "ke30_eq_dir",
+        "zsme09e_dir",
+        "zsmr019_dir",
+        "zsmr012_dir",
+        "iw58_dir",
+        "iw73_dir",
+        "scoring_ytdn_dir",
+    ):
         target_dir = paths.get(key)
         if target_dir:
             os.makedirs(target_dir, exist_ok=True)

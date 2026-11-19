@@ -38,62 +38,65 @@ envConnection = ReadEnvValue(envPath, "SAP_CONNECTION")
 If envUsername   = "" Then envUsername   = "2436dyu"
 If envConnection = "" Then envConnection = "SAP HANA AGDS PROD"
 
-' ── STEP 1: Cek apakah SAP session sudah aktif via GetObject ─────────────────
+' ── STEP 1: Cek apakah SAP GUI sudah berjalan atau jalankan saplogon.exe ───
 Dim waitCount, sapOk
 sapOk = False
 
 On Error Resume Next
 Set SapGuiAuto = GetObject("SAPGUI")
+If Err.Number <> 0 Or SapGuiAuto Is Nothing Then
+    Err.Clear
+    Shell.Run """C:\Program Files (x86)\SAP\FrontEnd\SAPgui\saplogon.exe""", 1, False
+    For waitCount = 1 To 20
+        WScript.Sleep 1000
+        Err.Clear
+        Set SapGuiAuto = GetObject("SAPGUI")
+        If Err.Number = 0 And Not SapGuiAuto Is Nothing Then Exit For
+    Next
+End If
+
+If Err.Number <> 0 Or SapGuiAuto Is Nothing Then
+    Err.Clear
+    Set SapGuiAuto = CreateObject("Sapgui.ScriptingCtrl.1")
+End If
+
 If Err.Number = 0 And Not SapGuiAuto Is Nothing Then
-    ' SAP Logon sudah terbuka — cek apakah ada koneksi aktif
     Set application = SapGuiAuto.GetScriptingEngine
-    If Err.Number = 0 And application.Children.Count > 0 Then
-        Dim connCheck
-        Set connCheck = application.Children(0)
-        If connCheck.Children.Count > 0 Then
-            sapOk = True  ' Ada session aktif, tidak perlu buka baru
+    If Err.Number = 0 And Not application Is Nothing Then
+        If application.Children.Count > 0 Then
+            Dim connCheck
+            Set connCheck = application.Children(0)
+            If connCheck.Children.Count > 0 Then
+                sapOk = True  ' Ada session aktif
+            End If
         End If
     End If
 End If
 Err.Clear
 On Error GoTo 0
 
-' ── STEP 2: Jika belum ada session, gunakan sapshcut.exe untuk buka koneksi langsung ──
+' ── STEP 2: Jika belum ada session, buka koneksi via OpenConnection ──────────
 If Not sapOk Then
-    Dim sapshcut
-    sapshcut = "C:\Program Files (x86)\SAP\FrontEnd\SapGui\sapshcut.exe"
-
-    ' sapshcut.exe membuka koneksi SAP langsung dengan user+password otomatis
-    Shell.Run """" & sapshcut & """ -system=""" & envConnection & """ -user=""" & envUsername & """ -pw=""" & envPassword & """ -language=EN", 1, False
-    WScript.Sleep 3000
-
-    ' Polling sampai GetObject("SAPGUI") berhasil dan ada session (maks 45 detik)
-    For waitCount = 1 To 45
-        On Error Resume Next
-        Err.Clear
-        Set SapGuiAuto = GetObject("SAPGUI")
-        If Err.Number = 0 And Not SapGuiAuto Is Nothing Then
-            Set application = SapGuiAuto.GetScriptingEngine
-            If Err.Number = 0 And application.Children.Count > 0 Then
-                Set connCheck = application.Children(0)
-                If connCheck.Children.Count > 0 Then
-                    sapOk = True
-                    Exit For
-                End If
+    On Error Resume Next
+    If Not application Is Nothing Then
+        Set connection = application.OpenConnection(envConnection, True)
+        WScript.Sleep 2500
+        If Err.Number = 0 And Not connection Is Nothing Then
+            If connection.Children.Count > 0 Then
+                sapOk = True
             End If
         End If
-        On Error GoTo 0
-        WScript.Sleep 1000
-    Next
+    End If
+    Err.Clear
     On Error GoTo 0
 End If
 
 If Not sapOk Then
-    WScript.Echo "ERROR: Tidak dapat membuka session SAP setelah 45 detik."
+    WScript.Echo "ERROR: Tidak dapat membuka session SAP untuk '" & envConnection & "'."
     WScript.Quit 1
 End If
 
-' ── STEP 3: Ambil / cari session aktif ───────────────────────────────────────
+' ── STEP 3: Ambil session aktif ──────────────────────────────────────────────
 If Not IsObject(application) Or application Is Nothing Then
     Set application = SapGuiAuto.GetScriptingEngine
 End If
@@ -131,6 +134,16 @@ If Err.Number = 0 And Not usrField Is Nothing Then
     If Len(envPassword) > 0 Then
         session.findById("wnd[0]").sendVKey 0
         WScript.Sleep 2500
+        
+        ' Cek pesan error di status bar setelah menekan Enter
+        Dim sbarMsg, sbarType
+        sbarMsg = session.findById("wnd[0]/sbar").Text
+        sbarType = session.findById("wnd[0]/sbar").MessageType
+        If sbarType = "E" Or sbarType = "A" Then
+            WScript.Echo "ERROR SAP LOGIN: [" & sbarType & "] " & sbarMsg
+            WScript.Quit 1
+        End If
+
         ' Dismiss multi-login / system message popup jika ada
         Err.Clear
         session.findById("wnd[1]/tbar[0]/btn[0]").press
@@ -153,11 +166,31 @@ For chkWait = 1 To 30
         ' Field login sudah hilang -> login berhasil
         Exit For
     End If
+    
+    ' Pantau status bar jika muncul pesan error
+    sbarMsg = session.findById("wnd[0]/sbar").Text
+    sbarType = session.findById("wnd[0]/sbar").MessageType
+    If sbarType = "E" Or sbarType = "A" Then
+        WScript.Echo "ERROR SAP LOGIN: [" & sbarType & "] " & sbarMsg
+        WScript.Quit 1
+    End If
+    
     WScript.Sleep 1000
 Next
 
+' Verifikasi final: pastikan sudah tidak di layar login
 On Error Resume Next
+Err.Clear
+session.findById("wnd[0]/usr/txtRSYST-BNAME")
+If Err.Number = 0 Then
+    sbarMsg = session.findById("wnd[0]/sbar").Text
+    sbarType = session.findById("wnd[0]/sbar").MessageType
+    WScript.Echo "ERROR: Masih berada di layar login SAP. Pesan: " & sbarMsg
+    WScript.Quit 1
+End If
+
 session.findById("wnd[0]").maximize
 On Error GoTo 0
 
+WScript.Echo "SUCCESS: Login SAP berhasil."
 WScript.Quit 0
