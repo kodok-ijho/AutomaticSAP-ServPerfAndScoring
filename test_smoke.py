@@ -52,10 +52,12 @@ class TestPathResolver(unittest.TestCase):
         paths = resolve_workspace_paths("2026-06-01", base_drive="D:\\Kerja")
         self.assertIn("2026 CSSD", paths["cssd_root"])
         self.assertIn("06 JUN 2026 REPORTING", paths["reporting_ss"])
+        self.assertIn("Automatic-", paths["auto_root"])
         self.assertIn("ZSMR007", paths["zsmr007b_dir"])
         self.assertIn("ZSME09E", paths["zsme09e_dir"])
         self.assertIn("KE30 - 06 JUN 26", paths["ke30_root"])
-        self.assertIn("AUTO", paths["ke30_div_dir"])
+        self.assertIn("KE30_Div", paths["ke30_div_dir"])
+        self.assertIn("KE30_Eq", paths["ke30_eq_dir"])
 
     def test_resolve_paths_august_2026(self):
         paths = resolve_workspace_paths("2026-08-01", base_drive="D:\\Kerja")
@@ -409,6 +411,98 @@ class TestProcessZSMR012(unittest.TestCase):
             self.assertEqual(len(first), len(ZSMR012_DB_COLUMNS))
             self.assertEqual(first["FileName"], "ZSMR012")
             self.assertEqual(first["proses"], False)
+
+    def test_deduplication_composite_key(self):
+        """Memastikan deduplikasi composite key (Order, ActivityType, ExecutionStart, ActualStart time) menghasilkan baris unik."""
+        rows = [
+            {
+                "Order": "4219951",
+                "ActivityType": "WKTIME",
+                "ExecutionStart": datetime(2026, 11, 2),
+                "ActualStart": datetime(1900, 1, 1, 14, 32, 7),
+            },
+            {
+                "Order": "4219951",
+                "ActivityType": "WKTIME",
+                "ExecutionStart": datetime(2026, 11, 2),
+                "ActualStart": datetime(1900, 1, 1, 14, 32, 7),
+            },
+            {
+                "Order": "4219951",
+                "ActivityType": "TRTIME",
+                "ExecutionStart": datetime(2026, 11, 2),
+                "ActualStart": datetime(1900, 1, 1, 13, 32, 7),
+            },
+            {
+                "Order": "4219951",
+                "ActivityType": "WKTIME",
+                "ExecutionStart": datetime(2026, 11, 2),
+                "ActualStart": datetime(2026, 11, 2, 14, 32, 7),
+            },
+        ]
+        seen_zsmr = set()
+        dedup_rows = []
+        for r in rows:
+            act_start = r.get("ActualStart")
+            act_start_time = (
+                act_start.strftime("%H:%M:%S")
+                if act_start and hasattr(act_start, "strftime")
+                else ""
+            )
+            key = (
+                r["Order"],
+                r.get("ActivityType") or "",
+                r.get("ExecutionStart"),
+                act_start_time,
+            )
+            if key not in seen_zsmr:
+                seen_zsmr.add(key)
+                dedup_rows.append(r)
+
+        self.assertEqual(len(dedup_rows), 2)
+        activity_types = [r["ActivityType"] for r in dedup_rows]
+        self.assertIn("WKTIME", activity_types)
+        self.assertIn("TRTIME", activity_types)
+
+    def test_filter_off_workcenter(self):
+        """Memastikan filter WorkCenter %-OFF% menyaring teknisi non-operasional."""
+        import tempfile
+        from process_zsmr012 import parse_zsmr012_file
+        headers = ["Order", "Work Ctr", "Start Ex.", "Act. start", "ActTyp"]
+        rows_data = [
+            ["4219951", "TDE-CUTI", "01.11.2026", "08:00:00", "WKTIME"],
+            ["4219952", "TDE-CUTI-OFF", "01.11.2026", "08:00:00", "WKTIME"],
+        ]
+        content = "\t".join(headers) + "\n" + "\n".join("\t".join(row) for row in rows_data) + "\n"
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".txt", delete=False) as f:
+            f.write(content)
+            tmp_path = f.name
+        try:
+            parsed = parse_zsmr012_file(tmp_path, "2026-11-01")
+            self.assertEqual(len(parsed), 1)
+            self.assertEqual(parsed[0]["WorkCenter"], "TDE-CUTI")
+            self.assertEqual(parsed[0]["Order"], "4219951")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_sequence_zsmr012_daily_config(self):
+        """Memastikan urutan otomasi harian ZSMR012 terkonfigurasi dengan insert-sql=False dan periode dynamic-today-ymd."""
+        import json
+        seq_path = os.path.join("custom_sequences", "zsmr012_daily_15days.json")
+        self.assertTrue(os.path.exists(seq_path), f"File {seq_path} harus ada")
+        with open(seq_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        items = cfg.get("items", [])
+        self.assertGreaterEqual(len(items), 4, "Sequence zsmr012_daily_15days harus memiliki minimal 4 item")
+
+        item_download = items[2]
+        self.assertEqual(item_download.get("name"), "DOWNLOAD BG JOB ZSMR012 – SAP Background Job")
+        self.assertEqual(item_download.get("params", {}).get("insert-sql"), "False")
+
+        item_process = items[3]
+        self.assertEqual(item_process.get("name"), "MERAPIHKAN HASIL DOWNLOAD – ZSMR012")
+        self.assertEqual(item_process.get("params", {}).get("periode"), "dynamic-today-ymd")
 
 
 class TestProcessIW58(unittest.TestCase):
