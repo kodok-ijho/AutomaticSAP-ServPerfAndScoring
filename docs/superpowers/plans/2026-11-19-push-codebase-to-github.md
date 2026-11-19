@@ -35,10 +35,10 @@
 **Deskripsi:**
 Memeriksa bahwa tidak ada rahasia/password dalam diff yang belum di-commit, men-stage file yang valid, dan membuat commit yang deskriptif.
 
-- [ ] 1. Verifikasi isi diff dan pastikan tidak ada data sensitif yang bocor.
-- [ ] 2. Stage file perubahan pipeline orchestrator, VBS, runner script, sequence template, dan dokumentasi plan.
-- [ ] 3. Jalankan unit test `python -m unittest test_smoke.py` untuk memastikan semua pengujian lulus.
-- [ ] 4. Buat git commit dengan pesan yang jelas (misal: `feat(pipeline): update daily orchestrator, path resolver, and batch runners`).
+- [x] 1. Verifikasi isi diff dan pastikan tidak ada data sensitif yang bocor.
+- [x] 2. Stage file perubahan pipeline orchestrator, VBS, runner script, sequence template, dan dokumentasi plan.
+- [x] 3. Jalankan unit test `python -m unittest test_smoke.py` untuk memastikan semua pengujian lulus.
+- [x] 4. Buat git commit dengan pesan yang jelas (misal: `feat(pipeline): update daily orchestrator, path resolver, and batch runners`).
 
 ---
 
