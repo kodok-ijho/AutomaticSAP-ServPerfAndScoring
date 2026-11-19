@@ -305,6 +305,10 @@ def parse_zsmr012_file(
             s = str(val).strip()
             return s[:max_len] if s else None
 
+        work_center = _safe_str(norm_dict.get("workctr") or row_dict.get("Work Ctr"), 255)
+        if work_center and "-OFF" in work_center.upper():
+            continue
+
         exec_start = parse_sap_date(norm_dict.get("startex") or row_dict.get("Start Ex-") or row_dict.get("Start Ex."))
         entered_on = parse_sap_date(norm_dict.get("entrydate") or row_dict.get("Entry Date"))
         exec_date = exec_start.date() if isinstance(exec_start, datetime) else exec_start
@@ -312,9 +316,22 @@ def parse_zsmr012_file(
         target_date_val = target_dt.date() if isinstance(target_dt, datetime) else target_dt
         row_date_periode = exec_date or entered_date or target_date_val
 
+        # Penanganan khusus kolom ConfirmationCounter & ReversedIndicator di spool SAP
+        conf_counter = None
+        rev_ind = None
+        conf_canceled = None
+        if len(parts) >= 27:
+            # Di spool SAP: Index 24 = Confirmati (1, 2, 3..), Index 25 = Reversed I, Index 26 = Confirmati (Cancel)
+            conf_counter = _safe_str(parts[24], 255)
+            rev_ind = _safe_str(parts[25], 255)
+            conf_canceled = _safe_str(parts[26], 255)
+        else:
+            conf_counter = _safe_str(norm_dict.get("confirmati") or row_dict.get("Confirmati"), 255)
+            rev_ind = _safe_str(norm_dict.get("reversedi") or row_dict.get("Reversed I"), 255)
+
         row = {
             "Order": order_val[:10],
-            "WorkCenter": _safe_str(norm_dict.get("workctr") or row_dict.get("Work Ctr"), 255),
+            "WorkCenter": work_center,
             "ExecutionStart": exec_start,
             "ActualStart": parse_sap_time(norm_dict.get("actstart") or norm_dict.get("actualstart") or row_dict.get("Act. start")),
             "ActualFinish": parse_sap_date(norm_dict.get("finexecut") or row_dict.get("FinExecut-") or row_dict.get("FinExecut.")),
@@ -340,9 +357,9 @@ def parse_zsmr012_file(
             "Location": _safe_str(norm_dict.get("location") or row_dict.get("Location"), 255),
             "Family": _safe_str(norm_dict.get("family") or row_dict.get("Family"), 255),
             "proses": False,
-            "ConfirmationCounter": _safe_str(norm_dict.get("confirmati") or row_dict.get("Confirmati"), 255),
-            "ReversedIndicator": _safe_str(norm_dict.get("reversedi") or row_dict.get("Reversed I"), 255),
-            "ConfirmationCounterOfCanceled": None,
+            "ConfirmationCounter": conf_counter,
+            "ReversedIndicator": rev_ind,
+            "ConfirmationCounterOfCanceled": conf_canceled,
         }
         data_rows.append(row)
 
@@ -408,11 +425,22 @@ def process_and_upload_zsmr012(
         print("       (Kondisi ini wajar jika background job di SAP memang tidak menghasilkan transaksi / spool kosong pada periode yang difilter).")
         return 0
 
-    # Deduplikasi dalam batch berdasarkan Order + ConfirmationCounter + ExecutionStart + ActualStart
+    # Deduplikasi dalam batch berdasarkan composite key: Order + ActivityType + ExecutionStart + ActualStartTime
     seen_zsmr = set()
     dedup_rows = []
     for r in all_rows:
-        key = (r["Order"], r.get("ConfirmationCounter"), r.get("ExecutionStart"), r.get("ActualStart"))
+        act_start = r.get("ActualStart")
+        act_start_time = (
+            act_start.strftime("%H:%M:%S")
+            if act_start and hasattr(act_start, "strftime")
+            else ""
+        )
+        key = (
+            r["Order"],
+            r.get("ActivityType") or "",
+            r.get("ExecutionStart"),
+            act_start_time,
+        )
         if key not in seen_zsmr:
             seen_zsmr.add(key)
             dedup_rows.append(r)
@@ -432,28 +460,87 @@ def process_and_upload_zsmr012(
         cursor.fast_executemany = True
 
         table_name = "dbo.ZSMR012"
-        date_str = target_dt.strftime("%Y-%m-%d")
 
         # 1. Hapus data existing pada DatePeriode target (jika re-run)
-        cursor.execute(
-            f"DELETE FROM {table_name} WHERE CAST(DatePeriode AS DATE) = ?",
-            (date_str,)
-        )
-        if cursor.rowcount and cursor.rowcount > 0:
-            print(f"[SQL] Membersihkan {cursor.rowcount:,} data lama pada periode {date_str}...")
+        if periode:
+            date_str = target_dt.strftime("%Y-%m-%d")
+            cursor.execute(
+                f"DELETE FROM {table_name} WHERE CAST(DatePeriode AS DATE) = ?",
+                (date_str,)
+            )
+            if cursor.rowcount and cursor.rowcount > 0:
+                print(f"[SQL] Membersihkan {cursor.rowcount:,} data lama pada periode {date_str}...")
+        else:
+            batch_dates = []
+            for r in dedup_rows:
+                d = r.get("DatePeriode") or r.get("ExecutionStart")
+                if d:
+                    if isinstance(d, datetime):
+                        batch_dates.append(d.date())
+                    elif isinstance(d, date):
+                        batch_dates.append(d)
+                    elif isinstance(d, str):
+                        try:
+                            batch_dates.append(datetime.strptime(d[:10], "%Y-%m-%d").date())
+                        except ValueError:
+                            pass
+            if batch_dates:
+                min_date_str = min(batch_dates).strftime("%Y-%m-%d")
+                max_date_str = max(batch_dates).strftime("%Y-%m-%d")
+                cursor.execute(
+                    f"DELETE FROM {table_name} WHERE CAST(DatePeriode AS DATE) >= ? AND CAST(DatePeriode AS DATE) <= ?",
+                    (min_date_str, max_date_str),
+                )
+                if cursor.rowcount and cursor.rowcount > 0:
+                    print(f"[SQL] Membersihkan {cursor.rowcount:,} data lama pada rentang {min_date_str} s/d {max_date_str}...")
+            else:
+                date_str = target_dt.strftime("%Y-%m-%d")
+                cursor.execute(
+                    f"DELETE FROM {table_name} WHERE CAST(DatePeriode AS DATE) = ?",
+                    (date_str,)
+                )
+                if cursor.rowcount and cursor.rowcount > 0:
+                    print(f"[SQL] Membersihkan {cursor.rowcount:,} data lama pada periode {date_str}...")
 
-        # 2. True UPSERT: Hapus record lama dengan Order & ConfirmationCounter yang sama di database
-        unique_keys = list({(r["Order"], r.get("ConfirmationCounter") or "") for r in dedup_rows if r.get("Order")})
+        # 2. True UPSERT: Hapus record lama dengan composite key yang sama di database
+        unique_keys = list({
+            (
+                r["Order"],
+                r.get("ActivityType") or "",
+                r.get("ExecutionStart"),
+                r["ActualStart"].strftime("%H:%M:%S") if r.get("ActualStart") and hasattr(r["ActualStart"], "strftime") else "",
+            )
+            for r in dedup_rows
+            if r.get("Order")
+        })
         if unique_keys:
-            cursor.execute("CREATE TABLE #TempZSMRKeys ([Order] NVARCHAR(10), [ConfirmationCounter] NVARCHAR(255));")
+            cursor.execute("""
+                CREATE TABLE #TempZSMRKeys (
+                    [Order] NVARCHAR(10),
+                    [ActivityType] NVARCHAR(255),
+                    [ExecutionStart] DATETIME,
+                    [ActualStartTime] VARCHAR(8)
+                );
+            """)
             cursor.fast_executemany = True
-            cursor.executemany("INSERT INTO #TempZSMRKeys ([Order], [ConfirmationCounter]) VALUES (?, ?)", unique_keys)
+            cursor.executemany(
+                "INSERT INTO #TempZSMRKeys ([Order], [ActivityType], [ExecutionStart], [ActualStartTime]) VALUES (?, ?, ?, ?)",
+                unique_keys,
+            )
             cursor.execute(f"""
                 DELETE Z
                 FROM {table_name} Z
                 INNER JOIN #TempZSMRKeys T
                     ON Z.[Order] = T.[Order]
-                   AND (ISNULL(Z.ConfirmationCounter, '') = T.ConfirmationCounter);
+                   AND ISNULL(Z.[ActivityType], '') = T.[ActivityType]
+                   AND (
+                       (Z.[ExecutionStart] IS NULL AND T.[ExecutionStart] IS NULL)
+                       OR CAST(Z.[ExecutionStart] AS DATE) = CAST(T.[ExecutionStart] AS DATE)
+                   )
+                   AND (
+                       (Z.[ActualStart] IS NULL AND (T.[ActualStartTime] = '' OR T.[ActualStartTime] IS NULL))
+                       OR CONVERT(VARCHAR(8), Z.[ActualStart], 108) = T.[ActualStartTime]
+                   );
                 DROP TABLE #TempZSMRKeys;
             """)
             if cursor.rowcount and cursor.rowcount > 0:

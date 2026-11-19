@@ -42,3 +42,6 @@ ZSMR007B - */
 # Logs & Runtime Dumps
 *.log
 logs/
+
+# Superpowers SDD workspace
+.superpowers/
