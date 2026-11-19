@@ -839,6 +839,82 @@ class TestMultiSessionVBS(unittest.TestCase):
             self.assertIn("SESSION_MANAGER", content, f"{vbs_rel} harus memeriksa SESSION_MANAGER")
 
 
+class TestImportZSMR012Excel(unittest.TestCase):
+    """Pengujian modul parser Excel ZSMR012 dan utilitas backup."""
+
+    def test_excel_parsing_and_mapping(self):
+        """Memvalidasi pembacaan file Excel ZSMR012, filtering WorkCenter %-OFF%, dan pemetaan kolom DB."""
+        import tempfile
+        import datetime
+        import openpyxl
+        from scripts.import_zsmr012_excel import parse_excel_zsmr012
+        from process_zsmr012 import ZSMR012_DB_COLUMNS
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+
+        headers = [
+            'Order  ', 'Equipment', 'ActTyp', 'Entry Date', 'Entered  ', 'Work Ctr',
+            'Start Ex. ', 'Act. start', 'FinExecut.', 'Act. Fin.', 'Act.work', 'Un.',
+            'Delay', 'Time    ', 'MAT', 'Type', 'Confirmati', 'Reversed I',
+            'Confirmati', 'Matnr EQ          ', 'Mat EQ Grp', 'Planner Gr',
+            'Portfolio', 'Detail Por ', 'Sales Type', 'Location', 'Family       ', 'DS  '
+        ]
+        ws.append(headers)
+
+        # Baris 1: Order 4108004, WorkCenter I1, Confirmati ke-1 '3', Confirmati ke-2 'CANCEL1', Act. start datetime.time(6, 0), Start Ex. datetime(2026, 10, 9)
+        row1 = [None] * len(headers)
+        row1[0] = 4108004
+        row1[5] = "I1"
+        row1[6] = datetime.datetime(2026, 10, 9)
+        row1[7] = datetime.time(6, 0)
+        row1[16] = "3"
+        row1[18] = "CANCEL1"
+        ws.append(row1)
+
+        # Baris 2: Order 4108005, WorkCenter I1-OFF (harus disaring)
+        row2 = [None] * len(headers)
+        row2[0] = 4108005
+        row2[5] = "I1-OFF"
+        row2[6] = datetime.datetime(2026, 10, 9)
+        row2[7] = datetime.time(7, 0)
+        row2[16] = "4"
+        ws.append(row2)
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tf:
+            tmp_path = tf.name
+
+        try:
+            wb.save(tmp_path)
+            wb.close()
+
+            rows, stats = parse_excel_zsmr012(tmp_path, exclude_off=True)
+
+            self.assertEqual(len(rows), 1, "Baris I1-OFF harus berhasil difilter")
+            row = rows[0]
+            self.assertEqual(row["Order"], "4108004")
+            self.assertEqual(row["ConfirmationCounter"], "3")
+            self.assertEqual(row["ConfirmationCounterOfCanceled"], "CANCEL1")
+            self.assertEqual(row["ActualStart"], datetime.datetime(1900, 1, 1, 6, 0))
+            self.assertEqual(row["FileName"], "ZSMR012")
+            self.assertEqual(row["proses"], False)
+            self.assertEqual(len(row), len(ZSMR012_DB_COLUMNS))
+            self.assertEqual(len(row), 30)
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
+    def test_backup_script_helpers(self):
+        """Memvalidasi fungsi format_table_name dari script backup_zsmr012_range."""
+        from scripts.backup_zsmr012_range import format_table_name
+
+        res = format_table_name("dbo.ZSMR012_BACKUP")
+        self.assertEqual(res, "[dbo].[ZSMR012_BACKUP]")
+
+
 if __name__ == "__main__":
     unittest.main()
 
